@@ -418,18 +418,16 @@ document.getElementById('btnClear').addEventListener('click',()=>{
 
     boundary.innerHTML = `
       <div class="bf-badge">
-        <div class="bf-badge-viewport">
-          <div class="bf-badge-sizer"></div>
-          <div class="bf-layer-bottom">
-            <img class="bf-art-image" src="${photoUrl}" alt="${name.first} ${name.last}" />
-          </div>
-          <div class="bf-layer-mid"></div>
-          <div class="bf-layer-top">
-            <div class="bf-frame-surface"></div>
-            <div class="bf-art-window-border"></div>
-          </div>
-          <div class="bf-gloss-overlay"></div>
+        <div class="bf-badge-sizer"></div>
+        <div class="bf-layer-bottom">
+          <img class="bf-art-image" src="${photoUrl}" alt="${name.first} ${name.last}" />
         </div>
+        <div class="bf-layer-mid"></div>
+        <div class="bf-layer-top">
+          <div class="bf-frame-surface"></div>
+          <div class="bf-art-window-border"></div>
+        </div>
+        <div class="bf-gloss-overlay"></div>
         <div class="bf-text-zone">
           <div class="bf-badge-name">${name.first} ${name.last}</div>
           <div class="bf-badge-alias">@${alias}</div>
