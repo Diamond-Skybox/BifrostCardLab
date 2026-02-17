@@ -346,25 +346,177 @@ document.getElementById('btnClear').addEventListener('click',()=>{
   }
 
   // ================================================================
-  // BIFROST CARD RENDERING (Phase 2 — TODO)
+  // BIFROST CARD RENDERING
   // ================================================================
 
+  // Card state
+  let bifrostCardEl = null;
+  let hiddenElements = [];
+
+  /**
+   * Build and inject the Bifrost badge card.
+   */
   function applyBifrostFrame(alias, shorthand) {
     log('Applying frame:', shorthand, 'for', alias);
-    // TODO Phase 2:
-    // - Hide HyperBadge .Container or native .worker-badge
-    // - Build Bifrost card DOM (layer-bottom/mid/top)
-    // - Insert photo as art-image
-    // - Insert name in text-zone
-    // - Apply effects from shorthand via Bifrost engine
-    // - Set up mousemove/leave for tilt + parallax
+
+    // Remove existing Bifrost card if re-applying
+    if (bifrostCardEl) removeBifrostFrame();
+
+    const badgeState = detectBadgeState();
+    const name = extractName();
+    const photoUrl = getFullBadgePhotoUrl(alias);
+
+    // Hide existing badge rendering
+    if (badgeState.hasHyperBadge && badgeState.hyperBadgeContainer) {
+      badgeState.hyperBadgeContainer.style.display = 'none';
+      hiddenElements.push(badgeState.hyperBadgeContainer);
+    } else if (badgeState.hasNativeBadge) {
+      const workerBadge = badgeState.nativeBadgeEl.querySelector('.worker-badge');
+      if (workerBadge) {
+        workerBadge.style.display = 'none';
+        hiddenElements.push(workerBadge);
+      }
+    }
+
+    // Build card DOM
+    const card = buildBifrostCard(photoUrl, name, alias);
+
+    // Insert into page
+    if (badgeState.hasHyperBadge && badgeState.hyperBadgeContainer) {
+      badgeState.hyperBadgeContainer.parentNode.insertBefore(
+        card, badgeState.hyperBadgeContainer
+      );
+    } else if (badgeState.hasNativeBadge) {
+      const workerBadge = badgeState.nativeBadgeEl.querySelector('.worker-badge');
+      if (workerBadge) {
+        workerBadge.parentNode.insertBefore(card, workerBadge);
+      } else {
+        badgeState.nativeBadgeEl.prepend(card);
+      }
+    }
+
+    bifrostCardEl = card;
+
+    // Set up tilt/parallax
+    setupTilt(card);
+
+    // Compute window height after card is in DOM
+    computeWindowH(card);
+
+    // TODO: Apply effects from shorthand string via Bifrost engine
+    log('Card injected');
   }
 
+  /**
+   * Build the Bifrost card DOM structure.
+   * Badge photos are 3:4 ratio.
+   */
+  function buildBifrostCard(photoUrl, name, alias) {
+    const boundary = document.createElement('div');
+    boundary.className = 'bifrost-boundary';
+    boundary.id = 'bifrost-badge-card';
+
+    boundary.innerHTML = `
+      <div class="bf-badge">
+        <div class="bf-badge-viewport">
+          <div class="bf-badge-sizer"></div>
+          <div class="bf-layer-bottom">
+            <img class="bf-art-image" src="${photoUrl}" alt="${name.first} ${name.last}" />
+          </div>
+          <div class="bf-layer-mid"></div>
+          <div class="bf-layer-top">
+            <div class="bf-frame-surface"></div>
+            <div class="bf-art-window-border"></div>
+          </div>
+          <div class="bf-gloss-overlay"></div>
+        </div>
+        <div class="bf-text-zone">
+          <div class="bf-badge-name">${name.first} ${name.last}</div>
+          <div class="bf-badge-alias">@${alias}</div>
+        </div>
+      </div>
+    `;
+
+    return boundary;
+  }
+
+  /**
+   * Compute --window-h from card width for the clip-path.
+   */
+  function computeWindowH(boundary) {
+    const card = boundary.querySelector('.bf-badge');
+    if (!card) return;
+
+    const update = () => {
+      const padding = 10; // --frame-padding
+      const winW = card.offsetWidth - padding * 2;
+      const winH = winW * (4 / 3); // 3:4 ratio
+      card.style.setProperty('--window-h', `${winH}px`);
+    };
+
+    update();
+
+    const observer = new ResizeObserver(update);
+    observer.observe(card);
+    // Store observer for cleanup
+    card._resizeObserver = observer;
+  }
+
+  /**
+   * Set up tilt and parallax on mousemove.
+   */
+  function setupTilt(boundary) {
+    const card = boundary.querySelector('.bf-badge');
+    if (!card) return;
+
+    boundary.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      const normX = (x - centerX) / centerX;
+      const normY = (y - centerY) / centerY;
+
+      card.style.setProperty('--rotateX', `${normY * -12}deg`);
+      card.style.setProperty('--rotateY', `${normX * 12}deg`);
+      card.style.setProperty('--glossX', `${(x / rect.width) * 100}%`);
+      card.style.setProperty('--glossY', `${(y / rect.height) * 100}%`);
+      card.style.setProperty('--parallax-x', `${normX * 8.5}px`);
+      card.style.setProperty('--parallax-y', `${normY * 8.5}px`);
+    });
+
+    boundary.addEventListener('mouseleave', () => {
+      card.style.setProperty('--rotateX', '0deg');
+      card.style.setProperty('--rotateY', '0deg');
+      card.style.setProperty('--glossX', '50%');
+      card.style.setProperty('--glossY', '50%');
+      card.style.setProperty('--parallax-x', '0px');
+      card.style.setProperty('--parallax-y', '0px');
+    });
+  }
+
+  /**
+   * Remove Bifrost card and restore original badge.
+   */
   function removeBifrostFrame() {
     log('Removing frame');
-    // TODO Phase 2:
-    // - Remove injected Bifrost card
-    // - Restore hidden HyperBadge or native badge
+
+    if (bifrostCardEl) {
+      const card = bifrostCardEl.querySelector('.bf-badge');
+      if (card && card._resizeObserver) {
+        card._resizeObserver.disconnect();
+      }
+      bifrostCardEl.remove();
+      bifrostCardEl = null;
+    }
+
+    // Restore hidden elements
+    hiddenElements.forEach(el => {
+      el.style.display = '';
+    });
+    hiddenElements = [];
   }
 
   // ================================================================
