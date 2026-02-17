@@ -12,7 +12,6 @@
     ROOT:             '', /* REPLACE: Base URL for your corp drive folder */
     BLOCKLIST_URL:    '', /* REPLACE: URL to blocked_aliases.json */
     USER_FRAMES_URL:  '', /* REPLACE: URL to user_frames.json */
-    PACK_MANIFEST_URL:'', /* REPLACE: URL to pack_manifest.json */
     VERSION: '0.1.0',
     BROADCAST_CHANNEL: 'bifrost-badge-lab',
     DEBUG: true,
