@@ -75,6 +75,13 @@ body{background:#0a0a12;color:#eee;font-family:-apple-system,BlinkMacSystemFont,
 .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(100px);background:#16213e;border:1px solid #00ff88;color:#00ff88;padding:0.75rem 1.5rem;border-radius:8px;font-size:0.85rem;transition:transform 0.3s ease;z-index:999}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .loading-msg{color:#666;font-size:0.85rem;text-align:center;padding:1rem}
+.cat-label{color:#666;font-size:0.65rem;text-transform:uppercase;letter-spacing:1px;margin:0.75rem 0 0.3rem;padding-bottom:0.2rem;border-bottom:1px solid #1a1a2e}
+.ascii-controls{background:#0d0d1a;border:1px solid #333;border-radius:8px;padding:0.75rem;margin-top:0.4rem}
+.ascii-select{width:100%;background:#16213e;color:#00ff88;border:1px solid #333;border-radius:6px;padding:0.4rem;font-family:monospace;font-size:0.8rem;margin-bottom:0.5rem}
+.ascii-options{display:flex;gap:1rem;margin-bottom:0.5rem;flex-wrap:wrap}
+.ascii-options label{color:#888;font-size:0.75rem;display:flex;align-items:center;gap:0.3rem}
+.ascii-options select{background:#16213e;color:#aaa;border:1px solid #333;border-radius:4px;padding:0.25rem;font-size:0.7rem}
+.ascii-play-btn{display:inline-block;margin-top:0.25rem}
 </style>
 </head>
 <body>
@@ -255,9 +262,10 @@ function initLab(alias, initialFx, tiltState) {
 
     var packCount = Object.keys(Bifrost.packs).length;
     var effectCount = Object.keys(Bifrost.effects).length;
+    var asciiCount = Object.keys(Bifrost.getAllAsciiAnims ? Bifrost.getAllAsciiAnims() : {}).length;
     document.getElementById('packStatus').textContent =
-      packCount + ' packs · ' + effectCount + ' effects loaded';
-    console.log('[Lab] Bifrost initialized:', packCount, 'packs,', effectCount, 'effects');
+      packCount + ' packs · ' + effectCount + ' effects · ' + asciiCount + ' ASCII animations';
+    console.log('[Lab] Bifrost initialized:', packCount, 'packs,', effectCount, 'effects,', asciiCount, 'ASCII');
   } else {
     document.getElementById('packStatus').textContent = 'Engine failed to load';
     console.error('[Lab] Bifrost engine not available');
@@ -280,11 +288,18 @@ function initLab(alias, initialFx, tiltState) {
       return;
     }
 
+    // Category display order
+    var catOrder = ['particle', 'flyover', 'overlay', 'distortion', 'light', 'environment', 'border', 'frame', 'text'];
+    var catLabels = { particle: '🌧️ Particles', flyover: '✈️ Flyovers', overlay: '🔲 Overlays', distortion: '👾 Distortion', light: '💡 Light', environment: '🌍 Environment', border: '🔲 Borders', frame: '🖼️ Frame', text: '✏️ Text', other: '✦ Other' };
+
     for (var _i = 0, _entries = Object.entries(Bifrost.packs); _i < _entries.length; _i++) {
       var packId = _entries[_i][0];
       var pack = _entries[_i][1];
       var effectIds = Object.keys(pack.effects || {});
       var asciiIds = Object.keys(pack.ascii || {});
+      var totalCount = effectIds.length + asciiIds.length;
+
+      if (totalCount === 0) continue;
 
       var wrapper = document.createElement('div');
 
@@ -292,8 +307,8 @@ function initLab(alias, initialFx, tiltState) {
       var toggle = document.createElement('div');
       toggle.className = 'pack-toggle';
       toggle.innerHTML = '<div class="pack-info"><div class="pack-name">'
-        + (pack.icon||'') + ' ' + pack.name
-        + '</div><div class="pack-count">' + (effectIds.length + asciiIds.length) + ' effects</div></div>'
+        + (pack.icon||'📦') + ' ' + pack.name
+        + '</div><div class="pack-count">' + totalCount + ' effects</div></div>'
         + '<div class="pack-switch" id="switch-'+packId+'"></div>';
 
       // Effects container
@@ -301,38 +316,134 @@ function initLab(alias, initialFx, tiltState) {
       effectsDiv.className = 'pack-effects';
       effectsDiv.id = 'effects-' + packId;
 
-      var grid = document.createElement('div');
-      grid.className = 'effects-grid';
+      // Group effects by category
+      var byCategory = {};
+      effectIds.forEach(function(fxId) {
+        var fx = pack.effects[fxId];
+        var cat = fx.category || 'other';
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push({ id: fxId, def: fx });
+      });
 
-      // Regular effects
-      (function(effectIds, pack, grid) {
-        effectIds.forEach(function(fxId) {
-          var fx = pack.effects[fxId];
-          var zones = fx.zones || ['mid'];
-          var btn = document.createElement('div');
-          btn.className = 'effect-btn';
-          btn.dataset.fxId = fxId;
-          btn.textContent = (fx.icon || '') + ' ' + (fx.name || fxId);
-          btn.addEventListener('click', function() { toggleEffect(fxId, zones, btn); });
-          grid.appendChild(btn);
+      // Sort categories
+      var sortedCats = Object.keys(byCategory).sort(function(a, b) {
+        var ai = catOrder.indexOf(a), bi = catOrder.indexOf(b);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      });
+
+      // Build effect buttons grouped by category
+      sortedCats.forEach(function(cat) {
+        var fxList = byCategory[cat];
+
+        var catLabel = document.createElement('div');
+        catLabel.className = 'cat-label';
+        catLabel.textContent = catLabels[cat] || ('✦ ' + cat);
+        effectsDiv.appendChild(catLabel);
+
+        var grid = document.createElement('div');
+        grid.className = 'effects-grid';
+
+        fxList.forEach(function(fx) {
+          var zones = fx.def.zones || ['mid'];
+
+          if (fx.def.type === 'text') {
+            // Text effect — single button
+            var btn = document.createElement('div');
+            btn.className = 'effect-btn';
+            btn.textContent = (fx.def.icon || '✏️') + ' ' + (fx.def.name || fx.id);
+            btn.addEventListener('click', function() {
+              toggleEffect(fx.id, 'text', btn);
+            });
+            grid.appendChild(btn);
+          } else if (fx.def.type === 'border' || cat === 'border') {
+            // Border effect — single button
+            var btn = document.createElement('div');
+            btn.className = 'effect-btn';
+            btn.textContent = (fx.def.icon || '🔲') + ' ' + (fx.def.name || fx.id);
+            btn.addEventListener('click', function() {
+              toggleEffect(fx.id, 'border', btn);
+            });
+            grid.appendChild(btn);
+          } else {
+            // Standard effect — one button per zone
+            zones.forEach(function(zone) {
+              var btn = document.createElement('div');
+              btn.className = 'effect-btn';
+              btn.dataset.fxId = fx.id;
+              btn.dataset.zone = zone;
+              var zoneBadge = zones.length > 1 ? '.' + zone : '';
+              btn.textContent = (fx.def.icon || '✦') + ' ' + (fx.def.name || fx.id) + zoneBadge;
+              btn.addEventListener('click', function() {
+                toggleEffect(fx.id, zone, btn);
+              });
+              grid.appendChild(btn);
+            });
+          }
         });
-      })(effectIds, pack, grid);
 
-      // ASCII effects
-      (function(pack, grid) {
-        Object.entries(pack.ascii || {}).forEach(function(entry) {
-          var animId = entry[0], anim = entry[1];
-          var btn = document.createElement('div');
-          btn.className = 'effect-btn';
-          btn.textContent = (anim.icon||'') + ' ' + (anim.label||animId);
-          btn.addEventListener('click', function() { toggleAscii(animId, btn); });
-          grid.appendChild(btn);
+        effectsDiv.appendChild(grid);
+      });
+
+      // ---- ASCII section for this pack ----
+      if (asciiIds.length > 0) {
+        var asciiLabel = document.createElement('div');
+        asciiLabel.className = 'cat-label';
+        asciiLabel.textContent = '🎮 ASCII Animations';
+        effectsDiv.appendChild(asciiLabel);
+
+        var asciiControls = document.createElement('div');
+        asciiControls.className = 'ascii-controls';
+
+        // Dropdown
+        var sel = document.createElement('select');
+        sel.className = 'ascii-select';
+        sel.innerHTML = '<option value="">— select animation —</option>';
+        asciiIds.forEach(function(animId) {
+          var anim = pack.ascii[animId];
+          var opt = document.createElement('option');
+          opt.value = animId;
+          opt.textContent = (anim.icon || '▸') + ' ' + (anim.label || animId);
+          sel.appendChild(opt);
         });
-      })(pack, grid);
+        asciiControls.appendChild(sel);
 
-      effectsDiv.appendChild(grid);
+        // Zone selector
+        var zoneRow = document.createElement('div');
+        zoneRow.className = 'ascii-options';
+        zoneRow.innerHTML =
+          '<label>Zone: <select class="ascii-zone-sel"><option value="mid">Mid</option><option value="top">Top</option><option value="bot">Bot</option></select></label>' +
+          '<label>Color: <select class="ascii-color-sel"><option value="#00ff88">Green</option><option value="#00ffff">Cyan</option><option value="#ff00ff">Magenta</option><option value="#ffaa00">Amber</option><option value="#ff4444">Red</option><option value="#ffffff">White</option></select></label>';
+        asciiControls.appendChild(zoneRow);
 
-      // Toggle click
+        // Play/Stop button
+        var playBtn = document.createElement('div');
+        playBtn.className = 'effect-btn ascii-play-btn';
+        playBtn.textContent = '▶ Play';
+        playBtn.addEventListener('click', function() {
+          var animId = sel.value;
+          if (!animId) return;
+          var key = 'ascii:' + animId;
+          var zone = asciiControls.querySelector('.ascii-zone-sel').value;
+          var color = asciiControls.querySelector('.ascii-color-sel').value;
+          if (selections.has(key)) {
+            if (Bifrost && Bifrost.stopAscii) Bifrost.stopAscii();
+            selections.delete(key);
+            playBtn.textContent = '▶ Play';
+            playBtn.classList.remove('active');
+          } else {
+            if (Bifrost && Bifrost.playAscii) Bifrost.playAscii(animId, zone, 50, 50, color);
+            selections.set(key, zone);
+            playBtn.textContent = '⏹ Stop';
+            playBtn.classList.add('active');
+          }
+          updateShorthand();
+        });
+        asciiControls.appendChild(playBtn);
+
+        effectsDiv.appendChild(asciiControls);
+      }
+
+      // Toggle click handler
       (function(packId) {
         toggle.addEventListener('click', function() {
           var sw = document.getElementById('switch-'+packId);
@@ -350,30 +461,15 @@ function initLab(alias, initialFx, tiltState) {
   }
 
   // ---- Effect toggling ----
-  function toggleEffect(fxId, zones, btn) {
-    if (selections.has(fxId)) {
-      var zone = selections.get(fxId);
-      if (Bifrost) Bifrost.deactivate(fxId, zone);
-      selections.delete(fxId);
-      btn.classList.remove('active');
-    } else {
-      var zone = zones[0];
-      if (Bifrost) Bifrost.activate(fxId, zone);
-      selections.set(fxId, zone);
-      btn.classList.add('active');
-    }
-    updateShorthand();
-  }
-
-  function toggleAscii(animId, btn) {
-    var key = 'ascii:' + animId;
+  function toggleEffect(fxId, zone, btn) {
+    var key = fxId + '-' + zone;
     if (selections.has(key)) {
-      if (Bifrost) Bifrost.stopAscii();
+      if (Bifrost) Bifrost.deactivate(fxId, zone);
       selections.delete(key);
       btn.classList.remove('active');
     } else {
-      if (Bifrost) Bifrost.playAscii(animId, 'mid', 50, 50, '#00ff88');
-      selections.set(key, 'mid');
+      if (Bifrost) Bifrost.activate(fxId, zone);
+      selections.set(key, zone);
       btn.classList.add('active');
     }
     updateShorthand();
@@ -381,8 +477,16 @@ function initLab(alias, initialFx, tiltState) {
 
   function updateShorthand() {
     var parts = [];
-    selections.forEach(function(zone, id) {
-      parts.push(id.startsWith('ascii:') ? id + '.' + zone : id + '.' + zone);
+    selections.forEach(function(zone, key) {
+      if (key.startsWith('ascii:')) {
+        parts.push(key + '.' + zone);
+      } else {
+        // key is fxId-zone, we want fxId.zone
+        var dashIdx = key.lastIndexOf('-');
+        var fxId = key.slice(0, dashIdx);
+        var z = key.slice(dashIdx + 1);
+        parts.push(fxId + '.' + z);
+      }
     });
     currentShorthand = parts.join(',');
     document.getElementById('shorthandDisplay').textContent = currentShorthand || 'No effects selected';
@@ -407,12 +511,8 @@ function initLab(alias, initialFx, tiltState) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(str).then(function() {
         showToast('Copied shorthand to clipboard.');
-      }).catch(function() {
-        fallbackCopy(str);
-      });
-    } else {
-      fallbackCopy(str);
-    }
+      }).catch(function() { fallbackCopy(str); });
+    } else { fallbackCopy(str); }
   });
 
   function fallbackCopy(str) {
@@ -430,6 +530,7 @@ function initLab(alias, initialFx, tiltState) {
     selections.clear();
     if (Bifrost) Bifrost.deactivateAll();
     document.querySelectorAll('.effect-btn.active').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.ascii-play-btn').forEach(function(b) { b.textContent = '▶ Play'; b.classList.remove('active'); });
     document.getElementById('shorthandDisplay').textContent = 'No effects selected';
     channel.postMessage({ type: 'bifrost-clear-local', alias: alias });
     showToast('Effects cleared.');
