@@ -398,12 +398,30 @@ document.getElementById('btnClear').addEventListener('click',()=>{
     bifrostCardEl = card;
 
     // Set up tilt/parallax
-    setupTilt(card);
+    const tiltState = setupTilt(card);
 
     // Compute window height after card is in DOM
     computeWindowH(card);
 
-    // TODO: Apply effects from shorthand string via Bifrost engine
+    // Initialize Bifrost engine with the card's layers
+    if (window.Bifrost) {
+      const badgeEl = card.querySelector('.bf-badge');
+      const layerEls = {
+        top: card.querySelector('.bf-layer-top'),
+        mid: card.querySelector('.bf-layer-mid'),
+        bot: card.querySelector('.bf-layer-bottom'),
+        text: card.querySelector('.bf-text-zone'),
+      };
+      Bifrost.init(badgeEl, layerEls, tiltState, null);
+
+      if (shorthand) {
+        Bifrost.applyShorthand(shorthand);
+      }
+      log('Bifrost engine initialized with', Object.keys(Bifrost.packs).length, 'packs');
+    } else {
+      log('Bifrost engine not loaded — card rendered without effects');
+    }
+
     log('Card injected');
   }
 
@@ -465,7 +483,9 @@ document.getElementById('btnClear').addEventListener('click',()=>{
    */
   function setupTilt(boundary) {
     const card = boundary.querySelector('.bf-badge');
-    if (!card) return;
+    if (!card) return { x: 0, y: 0 };
+
+    const tiltState = { x: 0, y: 0 };
 
     boundary.addEventListener('mousemove', (e) => {
       const rect = card.getBoundingClientRect();
@@ -477,6 +497,9 @@ document.getElementById('btnClear').addEventListener('click',()=>{
       const normX = (x - centerX) / centerX;
       const normY = (y - centerY) / centerY;
 
+      tiltState.x = normX;
+      tiltState.y = normY;
+
       card.style.setProperty('--rotateX', `${normY * -12}deg`);
       card.style.setProperty('--rotateY', `${normX * 12}deg`);
       card.style.setProperty('--glossX', `${(x / rect.width) * 100}%`);
@@ -486,6 +509,9 @@ document.getElementById('btnClear').addEventListener('click',()=>{
     });
 
     boundary.addEventListener('mouseleave', () => {
+      tiltState.x = 0;
+      tiltState.y = 0;
+
       card.style.setProperty('--rotateX', '0deg');
       card.style.setProperty('--rotateY', '0deg');
       card.style.setProperty('--glossX', '50%');
@@ -493,6 +519,8 @@ document.getElementById('btnClear').addEventListener('click',()=>{
       card.style.setProperty('--parallax-x', '0px');
       card.style.setProperty('--parallax-y', '0px');
     });
+
+    return tiltState;
   }
 
   /**
@@ -500,6 +528,11 @@ document.getElementById('btnClear').addEventListener('click',()=>{
    */
   function removeBifrostFrame() {
     log('Removing frame');
+
+    // Deactivate all effects
+    if (window.Bifrost) {
+      Bifrost.deactivateAll();
+    }
 
     if (bifrostCardEl) {
       const card = bifrostCardEl.querySelector('.bf-badge');
