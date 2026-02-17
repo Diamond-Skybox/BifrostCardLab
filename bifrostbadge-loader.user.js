@@ -18,6 +18,7 @@
 
   var VERSION = 'BifrostBadge 0.1.0';
   var ROOT = 'REPLACE_WITH_YOUR_DRIVE_URL';
+  var MANIFEST = 'REPLACE_WITH_YOUR_DRIVE_URL/pack_manifest.json';
 
   var applyUserscript = function() {
     var html = document.querySelector('html');
@@ -35,36 +36,41 @@
     style.href = ROOT + '/bifrostbadge.css';
     head.appendChild(style);
 
-    // Load Bifrost engine first, then packs, then main script
+    // Load Bifrost engine first
     var engine = document.createElement('script');
     engine.type = 'text/javascript';
     engine.src = ROOT + '/bifrost-engine.js';
     engine.onload = function() {
-      // Load packs in parallel, then main script when all done
-      var packFiles = ['cyberpunk.pack.js', 'elemental.pack.js', 'ascii-classics.pack.js'];
-      var loaded = 0;
+      // Fetch pack manifest, then load packs, then main script
+      fetch(MANIFEST, { credentials: 'include' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var packUrls = (data.packs || []).map(function(p) { return p.url; }).filter(Boolean);
+          if (packUrls.length === 0) return loadMain();
 
-      function onPackLoaded() {
-        loaded++;
-        if (loaded >= packFiles.length) {
-          // All packs loaded — now load main script
-          var main = document.createElement('script');
-          main.type = 'text/javascript';
-          main.src = ROOT + '/bifrostbadge.js';
-          head.appendChild(main);
-        }
-      }
-
-      packFiles.forEach(function(file) {
-        var pack = document.createElement('script');
-        pack.type = 'text/javascript';
-        pack.src = ROOT + '/' + file;
-        pack.onload = onPackLoaded;
-        pack.onerror = onPackLoaded; // Don't block on missing packs
-        head.appendChild(pack);
-      });
+          var loaded = 0;
+          packUrls.forEach(function(url) {
+            var pack = document.createElement('script');
+            pack.type = 'text/javascript';
+            pack.src = url;
+            pack.onload = function() { if (++loaded >= packUrls.length) loadMain(); };
+            pack.onerror = function() { if (++loaded >= packUrls.length) loadMain(); };
+            head.appendChild(pack);
+          });
+        })
+        .catch(function() {
+          console.warn('[BifrostBadge] Failed to load pack manifest — loading without packs');
+          loadMain();
+        });
     };
     head.appendChild(engine);
+
+    function loadMain() {
+      var main = document.createElement('script');
+      main.type = 'text/javascript';
+      main.src = ROOT + '/bifrostbadge.js';
+      head.appendChild(main);
+    }
   };
 
   if (document && document.head) {
