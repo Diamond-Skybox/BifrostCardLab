@@ -25,6 +25,172 @@
 }
 
 /* ================================================================ */
-/* BIFROST CARD (Phase 2 — placeholder)                             */
-/* Card structure styles will go here when rendering is implemented */
+/* BIFROST BADGE CARD                                               */
+/* 3-layer card: bottom (photo), mid (effects), top (frame)         */
+/* Badge photos are 3:4 ratio                                       */
 /* ================================================================ */
+
+.bifrost-boundary {
+  padding: 15px;
+  margin: -15px;
+  position: relative;
+}
+
+.bf-badge {
+  --rotateX: 0deg;
+  --rotateY: 0deg;
+  --glossX: 50%;
+  --glossY: 50%;
+  --parallax-x: 0px;
+  --parallax-y: 0px;
+
+  --frame-color: #16213e;
+  --frame-accent: #0f3460;
+  --border-color: #0f3460;
+  --border-width: 2px;
+  --frame-padding: 10px;
+  --card-radius: 12px;
+  --art-margin: 11px;
+  --window-h: 0px;
+
+  width: 180px;
+  position: relative;
+  cursor: pointer;
+  border-radius: var(--card-radius);
+  border: var(--border-width) solid var(--border-color);
+  background: var(--frame-color);
+
+  transform: perspective(1000px) rotateX(var(--rotateX)) rotateY(var(--rotateY));
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bf-badge:hover {
+  border-color: #54a0ff;
+  box-shadow:
+    0 8px 25px rgba(84, 160, 255, 0.2),
+    0 0 20px rgba(84, 160, 255, 0.1);
+}
+
+/* Viewport — clips parallax layers */
+.bf-badge-viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--card-radius) var(--card-radius) 0 0;
+}
+
+/* Sizer — creates 3:4 art window space */
+.bf-badge-sizer {
+  width: calc(100% - var(--frame-padding) * 2);
+  aspect-ratio: 3/4;
+  margin: var(--frame-padding) auto 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Bottom layer — photo with parallax */
+.bf-layer-bottom {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform: translateX(calc(var(--parallax-x) * -1)) translateY(calc(var(--parallax-y) * -1));
+}
+
+.bf-art-image {
+  display: block;
+  position: absolute;
+  top: calc(var(--frame-padding) - var(--art-margin));
+  left: calc(var(--frame-padding) - var(--art-margin));
+  width: calc(100% - var(--frame-padding) * 2 + var(--art-margin) * 2);
+  height: calc(var(--window-h) + var(--art-margin) * 2);
+  object-fit: cover;
+  object-position: center top;
+}
+
+/* Mid layer — effects space */
+.bf-layer-mid {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+  transform: translateX(calc(var(--parallax-x) * -0.5)) translateY(calc(var(--parallax-y) * -0.5));
+}
+
+/* Top layer — frame surface */
+.bf-layer-top {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: var(--card-radius);
+}
+
+.bf-frame-surface {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  background: var(--frame-color);
+  clip-path: polygon(
+    0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+    var(--frame-padding) var(--frame-padding),
+    var(--frame-padding) calc(var(--frame-padding) + var(--window-h)),
+    calc(100% - var(--frame-padding)) calc(var(--frame-padding) + var(--window-h)),
+    calc(100% - var(--frame-padding)) var(--frame-padding),
+    var(--frame-padding) var(--frame-padding)
+  );
+}
+
+.bf-art-window-border {
+  position: absolute;
+  top: var(--frame-padding);
+  left: var(--frame-padding);
+  right: var(--frame-padding);
+  height: var(--window-h);
+  border: 1px solid var(--frame-accent);
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Gloss overlay */
+.bf-gloss-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--card-radius);
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(
+    circle at var(--glossX) var(--glossY),
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.08) 25%,
+    transparent 50%
+  );
+}
+
+.bf-badge:hover .bf-gloss-overlay {
+  opacity: 1;
+}
+
+/* Text zone — below viewport, in flow */
+.bf-text-zone {
+  position: relative;
+  padding: 8px var(--frame-padding) var(--frame-padding);
+  text-align: center;
+}
+
+.bf-badge-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #eee;
+  line-height: 1.2;
+}
+
+.bf-badge-alias {
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 2px;
+  font-family: monospace;
+}
