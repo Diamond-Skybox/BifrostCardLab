@@ -9,9 +9,6 @@
   // CONFIG — Replace these URLs with your corp drive paths
   // ================================================================
   const CONFIG = {
-    ROOT:             '', /* REPLACE: Base URL for your corp drive folder */
-    BLOCKLIST_URL:    '', /* REPLACE: URL to blocked_aliases.json */
-    USER_FRAMES_URL:  '', /* REPLACE: URL to user_frames.json */
     VERSION: '0.1.0',
     BROADCAST_CHANNEL: 'bifrost-badge-lab',
     DEBUG: true,
@@ -45,22 +42,6 @@
       catch (e) { warn('localStorage remove failed:', e); }
     }
   };
-
-  // ================================================================
-  // DATA FETCHING
-  // ================================================================
-
-  async function fetchJSON(url) {
-    if (!url) return null;
-    try {
-      const resp = await fetch(url, { credentials: 'include' });
-      if (!resp.ok) return null;
-      return await resp.json();
-    } catch (e) {
-      warn('Failed to fetch', url, e);
-      return null;
-    }
-  }
 
   // ================================================================
   // ALIAS EXTRACTION
@@ -566,15 +547,16 @@ document.getElementById('btnClear').addEventListener('click',()=>{
     const photoUrl = getFullBadgePhotoUrl(alias);
     log('Name:', name.first, name.last);
 
-    // 3. Check blocklist
-    const blocklist = await fetchJSON(CONFIG.BLOCKLIST_URL);
+    // 3. Check blocklist (pre-loaded by loader via GM_xmlhttpRequest)
+    const bifrostData = window.__bifrostData || {};
+    const blocklist = bifrostData.blocklist;
     if (Array.isArray(blocklist) && blocklist.includes(alias)) {
       log('Alias blocklisted — skipping');
       return;
     }
 
-    // 4. Check database frames
-    const userFrames = await fetchJSON(CONFIG.USER_FRAMES_URL);
+    // 4. Check database frames (pre-loaded by loader)
+    const userFrames = bifrostData.userFrames;
     const dbFrame = userFrames ? userFrames[alias] : null;
     if (dbFrame) {
       log('Database frame found:', dbFrame);
