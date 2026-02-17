@@ -186,6 +186,8 @@
     const engineCode = bifrostData.engineSource || '';
     const packCodes = bifrostData.packSources || [];
 
+    log('Lab sources — engine:', engineCode.length, 'bytes, packs:', packCodes.map(s => s.length));
+
     const labHTML = generateLabHTML(alias, photoUrl, name, currentShorthand, engineCode, packCodes);
     const blob = new Blob([labHTML], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
@@ -193,12 +195,12 @@
   }
 
   function generateLabHTML(alias, photoUrl, name, currentShorthand, engineCode, packCodes) {
-    // Escape </script> in source code so it doesn't break the blob HTML
-    const escape = (code) => code.replace(/<\/script>/gi, '<\\/script>');
-    const inlineScripts = [engineCode, ...packCodes]
-      .filter(Boolean)
-      .map(code => '<script>' + escape(code) + '<\/script>')
-      .join('\n');
+    // Base64 encode scripts to avoid </script> and backtick escaping issues
+    const allCode = [engineCode, ...packCodes].filter(Boolean);
+    const encodedScripts = allCode.map(code => btoa(unescape(encodeURIComponent(code))));
+    const scriptLoaderCode = encodedScripts.map((b64, i) =>
+      `try { eval(decodeURIComponent(escape(atob("${b64}")))); } catch(e) { console.error("[BifrostLab] Script ${i} failed:", e); }`
+    ).join('\n');
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -325,8 +327,10 @@ body{background:#0a0a12;color:#eee;font-family:-apple-system,BlinkMacSystemFont,
 </div>
 <div class="toast" id="toast"></div>
 
-<!-- Bifrost engine + packs inlined -->
-${inlineScripts}
+<!-- Bifrost engine + packs (base64 decoded) -->
+<script>
+${scriptLoaderCode}
+<\/script>
 
 <script>
 const ALIAS = '${alias}';
