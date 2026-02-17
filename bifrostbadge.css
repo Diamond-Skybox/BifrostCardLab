@@ -75,7 +75,6 @@
 .bf-badge-viewport {
   position: relative;
   overflow: hidden;
-  border-radius: var(--card-radius) var(--card-radius) 0 0;
 }
 
 /* Sizer — creates 3:4 art window space */
