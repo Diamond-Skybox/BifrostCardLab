@@ -24,8 +24,8 @@
   var BLOCKLIST_URL = 'REPLACE_WITH_BLOCKLIST_URL';
   var FRAMES_URL    = 'REPLACE_WITH_FRAMES_URL';
 
-  // GM_xmlhttpRequest wrapper — bypasses CORS
-  function gmFetch(url) {
+  // GM_xmlhttpRequest wrappers — bypass CORS
+  function gmFetchJSON(url) {
     return new Promise(function(resolve) {
       if (!url) { resolve(null); return; }
       GM_xmlhttpRequest({
@@ -36,6 +36,18 @@
           catch(e) { resolve(null); }
         },
         onerror: function() { resolve(null); }
+      });
+    });
+  }
+
+  function gmFetchText(url) {
+    return new Promise(function(resolve) {
+      if (!url) { resolve(''); return; }
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url: url,
+        onload: function(resp) { resolve(resp.responseText || ''); },
+        onerror: function() { resolve(''); }
       });
     });
   }
@@ -58,41 +70,51 @@
 
     // Fetch all JSON data via GM (CORS-free), then load scripts
     Promise.all([
-      gmFetch(MANIFEST_URL),
-      gmFetch(BLOCKLIST_URL),
-      gmFetch(FRAMES_URL)
+      gmFetchJSON(MANIFEST_URL),
+      gmFetchJSON(BLOCKLIST_URL),
+      gmFetchJSON(FRAMES_URL)
     ]).then(function(results) {
-      // Store on window so bifrostbadge.js can read them
-      window.__bifrostData = {
-        root: ROOT,
-        engineUrl: ROOT + '/bifrost-engine.js',
-        manifest: results[0],
-        blocklist: results[1],
-        userFrames: results[2]
-      };
+      var manifest = results[0];
+      var packs = (manifest && manifest.packs) || [];
+      var packUrls = packs.map(function(p) { return p.url; }).filter(Boolean);
+      var engineUrl = ROOT + '/bifrost-engine.js';
 
-      // Load engine
-      var engine = document.createElement('script');
-      engine.type = 'text/javascript';
-      engine.src = ROOT + '/bifrost-engine.js';
-      engine.onload = function() {
-        // Load packs from manifest
-        var packs = (window.__bifrostData.manifest && window.__bifrostData.manifest.packs) || [];
-        var packUrls = packs.map(function(p) { return p.url; }).filter(Boolean);
+      // Also fetch engine + pack source as text for Lab blob inlining
+      var textFetches = [gmFetchText(engineUrl)].concat(
+        packUrls.map(function(url) { return gmFetchText(url); })
+      );
 
-        if (packUrls.length === 0) return loadMain();
+      return Promise.all(textFetches).then(function(sources) {
+        // Store on window so bifrostbadge.js can read them
+        window.__bifrostData = {
+          root: ROOT,
+          engineUrl: engineUrl,
+          manifest: manifest,
+          blocklist: results[1],
+          userFrames: results[2],
+          engineSource: sources[0] || '',
+          packSources: sources.slice(1)
+        };
 
-        var loaded = 0;
-        packUrls.forEach(function(url) {
-          var pack = document.createElement('script');
-          pack.type = 'text/javascript';
-          pack.src = url;
-          pack.onload = function() { if (++loaded >= packUrls.length) loadMain(); };
-          pack.onerror = function() { if (++loaded >= packUrls.length) loadMain(); };
-          head.appendChild(pack);
-        });
-      };
-      head.appendChild(engine);
+        // Load engine
+        var engine = document.createElement('script');
+        engine.type = 'text/javascript';
+        engine.src = engineUrl;
+        engine.onload = function() {
+          if (packUrls.length === 0) return loadMain();
+
+          var loaded = 0;
+          packUrls.forEach(function(url) {
+            var pack = document.createElement('script');
+            pack.type = 'text/javascript';
+            pack.src = url;
+            pack.onload = function() { if (++loaded >= packUrls.length) loadMain(); };
+            pack.onerror = function() { if (++loaded >= packUrls.length) loadMain(); };
+            head.appendChild(pack);
+          });
+        };
+        head.appendChild(engine);
+      });
     });
 
     function loadMain() {
