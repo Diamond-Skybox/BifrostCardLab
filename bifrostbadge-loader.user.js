@@ -11,7 +11,8 @@
 // @downloadURL  REPLACE_WITH_YOUR_DRIVE_URL/bifrostbadge-loader.user.js
 // @run-at       document-start
 // @grant        GM_xmlhttpRequest
-// @connect      REPLACE_WITH_YOUR_DRIVE_BASE_URL
+// @connect      drive-render.corp.amazon.com
+// @connect      drive.corp.amazon.com
 // ==/UserScript==
 
 (function () {
@@ -63,6 +64,8 @@
     ]).then(function(results) {
       // Store on window so bifrostbadge.js can read them
       window.__bifrostData = {
+        root: ROOT,
+        engineUrl: ROOT + '/bifrost-engine.js',
         manifest: results[0],
         blocklist: results[1],
         userFrames: results[2]
