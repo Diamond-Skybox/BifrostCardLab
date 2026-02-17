@@ -52,6 +52,7 @@
   --card-radius: 12px;
   --art-margin: 11px;
   --window-h: 0px;
+  --text-zone-h: 52px;
 
   width: 180px;
   position: relative;
@@ -77,6 +78,7 @@
   width: calc(100% - var(--frame-padding) * 2);
   aspect-ratio: 3/4;
   margin: var(--frame-padding) auto 0;
+  padding-bottom: var(--text-zone-h);
   visibility: hidden;
   pointer-events: none;
 }
@@ -169,11 +171,15 @@
   opacity: 1;
 }
 
-/* Text zone — below viewport, in flow */
+/* Text zone — positioned at bottom of card */
 .bf-text-zone {
-  position: relative;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   padding: 8px var(--frame-padding) var(--frame-padding);
   text-align: center;
+  z-index: 6;
 }
 
 .bf-badge-name {
