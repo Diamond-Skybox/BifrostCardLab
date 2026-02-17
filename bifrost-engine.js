@@ -86,7 +86,13 @@ window.Bifrost = (() => {
     };
 
     // Init
-    def.init(ctx);
+    if (def.init) {
+      def.init(ctx);
+    } else if (def.className) {
+      // CSS class-based effect (borders, etc)
+      card.classList.add(def.className);
+      ctx.data._className = def.className;
+    }
     active[key] = { ctx, packId: pack.id, effectId, zone };
 
     // Notify pack
@@ -102,7 +108,7 @@ window.Bifrost = (() => {
 
     const { ctx, packId } = entry;
     const e = effects[effectId];
-    if (e) e.def.cleanup(ctx);
+    if (e && e.def.cleanup) e.def.cleanup(ctx);
 
     // Clear common resources
     if (ctx.interval) clearInterval(ctx.interval);
@@ -110,7 +116,10 @@ window.Bifrost = (() => {
     ctx.container.remove();
     delete active[key];
 
-    // Remove CSS class if applied to layer/card
+    // Remove CSS class if applied to card
+    if (ctx.data && ctx.data._className) {
+      card.classList.remove(ctx.data._className);
+    }
     if (ctx._appliedClass) {
       const target = zone === 'border' || zone === 'card' ? card : getLayer(zone);
       target.classList.remove(ctx._appliedClass);
