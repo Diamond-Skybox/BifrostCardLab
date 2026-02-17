@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bifrost Card Effects Lab</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a12;color:#eee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem}
+.lab-header{text-align:center;margin-bottom:2rem}
+.lab-header h1{font-size:1.8rem;background:linear-gradient(135deg,#54a0ff,#00ff88,#e94560);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:0.5rem}
+.lab-header .subtitle{color:#888;font-size:0.9rem}
+.lab-header .alias{color:#54a0ff;font-family:monospace}
+.lab-header .pack-status{color:#555;font-size:0.75rem;font-family:monospace;margin-top:0.5rem}
+.lab-content{display:flex;gap:2rem;max-width:1100px;width:100%}
+.preview-panel{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:1rem;position:sticky;top:2rem;align-self:flex-start}
+.controls-panel{flex:1;min-width:0}
+.section{background:#16213e;border:1px solid #0f3460;border-radius:10px;padding:1.25rem;margin-bottom:1rem}
+.section h3{font-size:0.9rem;color:#54a0ff;margin-bottom:0.75rem}
+
+/* Preview card */
+.preview-boundary{padding:15px;margin:-15px;position:relative}
+.bf-badge{
+  --rotateX:0deg;--rotateY:0deg;--glossX:50%;--glossY:50%;
+  --parallax-x:0px;--parallax-y:0px;
+  --frame-color:#16213e;--frame-accent:#0f3460;--border-color:#0f3460;--border-width:2px;
+  --frame-padding:10px;--card-radius:12px;--art-margin:11px;--window-h:0px;--text-zone-h:52px;
+  width:200px;position:relative;overflow:hidden;cursor:pointer;
+  border-radius:var(--card-radius);border:var(--border-width) solid var(--border-color);
+  background:var(--frame-color);
+  transform:perspective(1000px) rotateX(var(--rotateX)) rotateY(var(--rotateY));
+  transition:border-color 0.2s ease,box-shadow 0.2s ease;
+}
+.bf-badge:hover{border-color:#54a0ff;box-shadow:0 8px 25px rgba(84,160,255,0.2),0 0 20px rgba(84,160,255,0.1)}
+.bf-badge-sizer{width:calc(100% - var(--frame-padding)*2);aspect-ratio:3/4;margin:var(--frame-padding) auto 0;padding-bottom:var(--text-zone-h);visibility:hidden;pointer-events:none}
+.bf-layer-bottom{position:absolute;inset:0;z-index:1;transform:translateX(calc(var(--parallax-x)*-1)) translateY(calc(var(--parallax-y)*-1))}
+.bf-art-image{display:block;position:absolute;top:calc(var(--frame-padding) - var(--art-margin));left:calc(var(--frame-padding) - var(--art-margin));width:calc(100% - var(--frame-padding)*2 + var(--art-margin)*2);height:calc(var(--window-h) + var(--art-margin)*2);object-fit:cover;object-position:center top}
+.bf-layer-mid{position:absolute;inset:0;overflow:hidden;z-index:2;pointer-events:none;transform:translateX(calc(var(--parallax-x)*-0.5)) translateY(calc(var(--parallax-y)*-0.5))}
+.bf-layer-top{position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;z-index:3;pointer-events:none}
+.bf-frame-surface{position:absolute;inset:0;border-radius:var(--card-radius);overflow:hidden;background:var(--frame-color);
+  clip-path:polygon(0% 0%,100% 0%,100% 100%,0% 100%,0% 0%,var(--frame-padding) var(--frame-padding),var(--frame-padding) calc(var(--frame-padding) + var(--window-h)),calc(100% - var(--frame-padding)) calc(var(--frame-padding) + var(--window-h)),calc(100% - var(--frame-padding)) var(--frame-padding),var(--frame-padding) var(--frame-padding))}
+.bf-art-window-border{position:absolute;top:var(--frame-padding);left:var(--frame-padding);right:var(--frame-padding);height:var(--window-h);border:1px solid var(--frame-accent);pointer-events:none;z-index:4}
+.bf-gloss-overlay{position:absolute;inset:0;border-radius:var(--card-radius);pointer-events:none;z-index:5;opacity:0;transition:opacity 0.3s ease;background:radial-gradient(circle at var(--glossX) var(--glossY),rgba(255,255,255,0.2) 0%,rgba(255,255,255,0.08) 25%,transparent 50%)}
+.bf-badge:hover .bf-gloss-overlay{opacity:1}
+.bf-text-zone{position:absolute;bottom:0;left:0;right:0;padding:8px var(--frame-padding) var(--frame-padding);text-align:center;z-index:6}
+.bf-badge-name{font-size:0.85rem;font-weight:600;color:#eee;line-height:1.2}
+.bf-badge-alias{font-size:0.7rem;color:#888;margin-top:2px;font-family:monospace}
+
+/* Controls */
+.pack-toggle{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0.75rem;background:#0d0d1a;border:1px solid #333;border-radius:6px;margin-bottom:0.5rem;cursor:pointer;transition:border-color 0.2s}
+.pack-toggle:hover{border-color:#54a0ff}
+.pack-toggle.enabled{border-color:#00ff88;background:rgba(0,255,136,0.05)}
+.pack-info{display:flex;flex-direction:column;gap:0.1rem}
+.pack-name{color:#ccc;font-size:0.85rem}
+.pack-count{color:#666;font-size:0.7rem}
+.pack-switch{width:40px;height:20px;background:#333;border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0}
+.pack-switch.on{background:#00ff88}
+.pack-switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:white;border-radius:50%;transition:transform 0.2s}
+.pack-switch.on::after{transform:translateX(20px)}
+.pack-effects{margin-top:0.5rem;display:none}
+.pack-effects.visible{display:block}
+.effects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:0.4rem}
+.effect-btn{padding:0.4rem 0.5rem;background:#0d0d1a;border:1px solid #333;border-radius:6px;color:#ccc;font-size:0.75rem;cursor:pointer;transition:all 0.2s;text-align:center;user-select:none}
+.effect-btn:hover{border-color:#54a0ff;color:#fff}
+.effect-btn.active{border-color:#e94560;background:rgba(233,69,96,0.1);color:#e94560}
+.shorthand-display{background:#0d0d1a;border:1px solid #333;border-radius:6px;padding:0.75rem;font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#00ff88;word-break:break-all;min-height:2.5rem}
+.action-buttons{display:flex;gap:0.75rem;margin-top:1rem}
+.action-btn{flex:1;padding:0.75rem 1rem;border:1px solid;border-radius:8px;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.2s;text-align:center;user-select:none}
+.action-btn.save{background:rgba(0,255,136,0.1);border-color:#00ff88;color:#00ff88}
+.action-btn.save:hover{background:rgba(0,255,136,0.2);box-shadow:0 0 12px rgba(0,255,136,0.3)}
+.action-btn.copy{background:rgba(84,160,255,0.1);border-color:#54a0ff;color:#54a0ff}
+.action-btn.copy:hover{background:rgba(84,160,255,0.2);box-shadow:0 0 12px rgba(84,160,255,0.3)}
+.action-btn.clear{background:rgba(233,69,96,0.1);border-color:#e94560;color:#e94560;flex:0.5}
+.action-btn.clear:hover{background:rgba(233,69,96,0.2)}
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(100px);background:#16213e;border:1px solid #00ff88;color:#00ff88;padding:0.75rem 1.5rem;border-radius:8px;font-size:0.85rem;transition:transform 0.3s ease;z-index:999}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.loading-msg{color:#666;font-size:0.85rem;text-align:center;padding:1rem}
+</style>
+</head>
+<body>
+
+<div class="lab-header">
+  <h1>Bifrost Card Effects Lab</h1>
+  <div class="subtitle" id="subtitle">Loading...</div>
+  <div class="pack-status" id="packStatus"></div>
+</div>
+
+<div class="lab-content">
+  <div class="preview-panel">
+    <div class="preview-boundary" id="previewBoundary">
+      <div class="bf-badge" id="previewCard">
+        <div class="bf-badge-sizer"></div>
+        <div class="bf-layer-bottom" id="layerBottom">
+          <img class="bf-art-image" id="artImage" src="" alt="" onerror="this.style.display='none'"/>
+        </div>
+        <div class="bf-layer-mid" id="layerMid"></div>
+        <div class="bf-layer-top" id="layerTop">
+          <div class="bf-frame-surface"></div>
+          <div class="bf-art-window-border"></div>
+        </div>
+        <div class="bf-gloss-overlay"></div>
+        <div class="bf-text-zone" id="textZone">
+          <div class="bf-badge-name" id="badgeName"></div>
+          <div class="bf-badge-alias" id="badgeAlias"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls-panel">
+    <div class="section">
+      <h3>Effect Packs</h3>
+      <div id="packList"><div class="loading-msg">Loading packs...</div></div>
+    </div>
+    <div class="section">
+      <h3>Current Shorthand</h3>
+      <div class="shorthand-display" id="shorthandDisplay">No effects selected</div>
+      <div class="action-buttons">
+        <div class="action-btn save" id="btnSave">Apply Locally</div>
+        <div class="action-btn copy" id="btnCopy">Copy for Slack</div>
+        <div class="action-btn clear" id="btnClear">Clear</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ============================================================ -->
+<!-- CONFIGURATION — Update this URL to your drive folder          -->
+<!-- ============================================================ -->
+<script>
+const LAB_CONFIG = {
+  ROOT: 'REPLACE_WITH_YOUR_DRIVE_URL',
+  MANIFEST: 'REPLACE_WITH_YOUR_DRIVE_URL/pack_manifest.json',
+  BROADCAST_CHANNEL: 'bifrost-badge-channel'
+};
+</script>
+
+<!-- ============================================================ -->
+<!-- Engine loads first, then packs via manifest, then lab init    -->
+<!-- ============================================================ -->
+<script>
+(function() {
+  // ---- Read query params ----
+  const params = new URLSearchParams(window.location.search);
+  const ALIAS = params.get('alias') || 'unknown';
+  const PHOTO = params.get('photo') || '';
+  const NAME = params.get('name') || 'Unknown User';
+  const FX = params.get('fx') || '';
+
+  // Populate the card
+  document.getElementById('subtitle').innerHTML =
+    'Customizing badge for <span class="alias">@' + ALIAS + '</span> &mdash; ' + NAME;
+  document.getElementById('artImage').src = PHOTO;
+  document.getElementById('artImage').alt = NAME;
+  document.getElementById('badgeName').textContent = NAME;
+  document.getElementById('badgeAlias').textContent = '@' + ALIAS;
+  if (FX) document.getElementById('shorthandDisplay').textContent = FX;
+
+  // ---- Card preview setup ----
+  const card = document.getElementById('previewCard');
+  const boundary = document.getElementById('previewBoundary');
+  const tiltState = { x: 0, y: 0 };
+
+  function computeWindowH() {
+    const padding = 10;
+    const winW = card.offsetWidth - padding * 2;
+    if (winW <= 0) return; // not laid out yet
+    const winH = winW * (4/3);
+    card.style.setProperty('--window-h', winH + 'px');
+  }
+  computeWindowH();
+  new ResizeObserver(computeWindowH).observe(card);
+  setTimeout(computeWindowH, 100);
+  window.addEventListener('load', computeWindowH);
+
+  // Tilt
+  boundary.addEventListener('mousemove', function(e) {
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const cx = rect.width/2, cy = rect.height/2;
+    const nx = (x-cx)/cx, ny = (y-cy)/cy;
+    tiltState.x = nx; tiltState.y = ny;
+    card.style.setProperty('--rotateX', (ny*-12)+'deg');
+    card.style.setProperty('--rotateY', (nx*12)+'deg');
+    card.style.setProperty('--glossX', (x/rect.width*100)+'%');
+    card.style.setProperty('--glossY', (y/rect.height*100)+'%');
+    card.style.setProperty('--parallax-x', (nx*8.5)+'px');
+    card.style.setProperty('--parallax-y', (ny*8.5)+'px');
+  });
+  boundary.addEventListener('mouseleave', function() {
+    tiltState.x = 0; tiltState.y = 0;
+    card.style.setProperty('--rotateX','0deg');
+    card.style.setProperty('--rotateY','0deg');
+    card.style.setProperty('--glossX','50%');
+    card.style.setProperty('--glossY','50%');
+    card.style.setProperty('--parallax-x','0px');
+    card.style.setProperty('--parallax-y','0px');
+  });
+
+  // ---- Load engine, then manifest, then packs ----
+  function loadScript(url) {
+    return new Promise(function(resolve, reject) {
+      var s = document.createElement('script');
+      s.src = url;
+      s.onload = resolve;
+      s.onerror = function() { console.warn('[Lab] Failed to load:', url); resolve(); };
+      document.head.appendChild(s);
+    });
+  }
+
+  // Load engine first
+  loadScript(LAB_CONFIG.ROOT + '/bifrost-engine.js').then(function() {
+    console.log('[Lab] Engine loaded:', !!window.Bifrost);
+
+    // Fetch manifest
+    return fetch(LAB_CONFIG.MANIFEST, { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .catch(function() {
+        console.warn('[Lab] Failed to fetch manifest');
+        return { packs: [] };
+      });
+  }).then(function(manifest) {
+    // Load all packs
+    var packUrls = (manifest.packs || []).map(function(p) { return p.url; }).filter(Boolean);
+    console.log('[Lab] Loading', packUrls.length, 'packs');
+    return Promise.all(packUrls.map(loadScript));
+  }).then(function() {
+    // Everything loaded — init
+    initLab(ALIAS, FX, tiltState);
+  });
+
+  // ---- Store on window for initLab ----
+  window._labParams = { alias: ALIAS, photo: PHOTO, name: NAME, fx: FX };
+})();
+
+// ============================================================
+// LAB INIT — called after engine + packs are loaded
+// ============================================================
+function initLab(alias, initialFx, tiltState) {
+  const card = document.getElementById('previewCard');
+  const channel = new BroadcastChannel(LAB_CONFIG.BROADCAST_CHANNEL);
+  const selections = new Map();
+  let currentShorthand = initialFx || '';
+
+  // Init Bifrost engine
+  if (window.Bifrost) {
+    Bifrost.init(card, {
+      top: document.getElementById('layerTop'),
+      mid: document.getElementById('layerMid'),
+      bot: document.getElementById('layerBottom'),
+      text: document.getElementById('textZone')
+    }, tiltState, null);
+
+    var packCount = Object.keys(Bifrost.packs).length;
+    var effectCount = Object.keys(Bifrost.effects).length;
+    document.getElementById('packStatus').textContent =
+      packCount + ' packs · ' + effectCount + ' effects loaded';
+    console.log('[Lab] Bifrost initialized:', packCount, 'packs,', effectCount, 'effects');
+  } else {
+    document.getElementById('packStatus').textContent = 'Engine failed to load';
+    console.error('[Lab] Bifrost engine not available');
+  }
+
+  // Apply initial shorthand
+  if (currentShorthand && window.Bifrost) {
+    Bifrost.applyShorthand(currentShorthand);
+  }
+
+  // ---- Build pack UI ----
+  buildPackUI();
+
+  function buildPackUI() {
+    var packList = document.getElementById('packList');
+    packList.innerHTML = '';
+
+    if (!window.Bifrost || Object.keys(Bifrost.packs).length === 0) {
+      packList.innerHTML = '<div class="loading-msg">No packs loaded</div>';
+      return;
+    }
+
+    for (var _i = 0, _entries = Object.entries(Bifrost.packs); _i < _entries.length; _i++) {
+      var packId = _entries[_i][0];
+      var pack = _entries[_i][1];
+      var effectIds = Object.keys(pack.effects || {});
+      var asciiIds = Object.keys(pack.ascii || {});
+
+      var wrapper = document.createElement('div');
+
+      // Toggle header
+      var toggle = document.createElement('div');
+      toggle.className = 'pack-toggle';
+      toggle.innerHTML = '<div class="pack-info"><div class="pack-name">'
+        + (pack.icon||'') + ' ' + pack.name
+        + '</div><div class="pack-count">' + (effectIds.length + asciiIds.length) + ' effects</div></div>'
+        + '<div class="pack-switch" id="switch-'+packId+'"></div>';
+
+      // Effects container
+      var effectsDiv = document.createElement('div');
+      effectsDiv.className = 'pack-effects';
+      effectsDiv.id = 'effects-' + packId;
+
+      var grid = document.createElement('div');
+      grid.className = 'effects-grid';
+
+      // Regular effects
+      (function(effectIds, pack, grid) {
+        effectIds.forEach(function(fxId) {
+          var fx = pack.effects[fxId];
+          var zones = fx.zones || ['mid'];
+          var btn = document.createElement('div');
+          btn.className = 'effect-btn';
+          btn.dataset.fxId = fxId;
+          btn.textContent = (fx.icon || '') + ' ' + (fx.name || fxId);
+          btn.addEventListener('click', function() { toggleEffect(fxId, zones, btn); });
+          grid.appendChild(btn);
+        });
+      })(effectIds, pack, grid);
+
+      // ASCII effects
+      (function(pack, grid) {
+        Object.entries(pack.ascii || {}).forEach(function(entry) {
+          var animId = entry[0], anim = entry[1];
+          var btn = document.createElement('div');
+          btn.className = 'effect-btn';
+          btn.textContent = (anim.icon||'') + ' ' + (anim.label||animId);
+          btn.addEventListener('click', function() { toggleAscii(animId, btn); });
+          grid.appendChild(btn);
+        });
+      })(pack, grid);
+
+      effectsDiv.appendChild(grid);
+
+      // Toggle click
+      (function(packId) {
+        toggle.addEventListener('click', function() {
+          var sw = document.getElementById('switch-'+packId);
+          var ef = document.getElementById('effects-'+packId);
+          var isOn = sw.classList.toggle('on');
+          toggle.classList.toggle('enabled', isOn);
+          ef.classList.toggle('visible', isOn);
+        });
+      })(packId);
+
+      wrapper.appendChild(toggle);
+      wrapper.appendChild(effectsDiv);
+      packList.appendChild(wrapper);
+    }
+  }
+
+  // ---- Effect toggling ----
+  function toggleEffect(fxId, zones, btn) {
+    if (selections.has(fxId)) {
+      var zone = selections.get(fxId);
+      if (Bifrost) Bifrost.deactivate(fxId, zone);
+      selections.delete(fxId);
+      btn.classList.remove('active');
+    } else {
+      var zone = zones[0];
+      if (Bifrost) Bifrost.activate(fxId, zone);
+      selections.set(fxId, zone);
+      btn.classList.add('active');
+    }
+    updateShorthand();
+  }
+
+  function toggleAscii(animId, btn) {
+    var key = 'ascii:' + animId;
+    if (selections.has(key)) {
+      if (Bifrost) Bifrost.stopAscii();
+      selections.delete(key);
+      btn.classList.remove('active');
+    } else {
+      if (Bifrost) Bifrost.playAscii(animId, 'mid', 50, 50, '#00ff88');
+      selections.set(key, 'mid');
+      btn.classList.add('active');
+    }
+    updateShorthand();
+  }
+
+  function updateShorthand() {
+    var parts = [];
+    selections.forEach(function(zone, id) {
+      parts.push(id.startsWith('ascii:') ? id + '.' + zone : id + '.' + zone);
+    });
+    currentShorthand = parts.join(',');
+    document.getElementById('shorthandDisplay').textContent = currentShorthand || 'No effects selected';
+  }
+
+  // ---- Toast ----
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function() { t.classList.remove('show'); }, 2500);
+  }
+
+  // ---- Actions ----
+  document.getElementById('btnSave').addEventListener('click', function() {
+    channel.postMessage({ type: 'bifrost-save-local', alias: alias, shorthand: currentShorthand });
+    showToast('Saved locally! Effect applied on badge page.');
+  });
+
+  document.getElementById('btnCopy').addEventListener('click', function() {
+    var str = 'fx:' + currentShorthand;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(str).then(function() {
+        showToast('Copied shorthand to clipboard.');
+      }).catch(function() {
+        fallbackCopy(str);
+      });
+    } else {
+      fallbackCopy(str);
+    }
+  });
+
+  function fallbackCopy(str) {
+    var ta = document.createElement('textarea');
+    ta.value = str;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    showToast('Copied shorthand to clipboard.');
+  }
+
+  document.getElementById('btnClear').addEventListener('click', function() {
+    currentShorthand = '';
+    selections.clear();
+    if (Bifrost) Bifrost.deactivateAll();
+    document.querySelectorAll('.effect-btn.active').forEach(function(b) { b.classList.remove('active'); });
+    document.getElementById('shorthandDisplay').textContent = 'No effects selected';
+    channel.postMessage({ type: 'bifrost-clear-local', alias: alias });
+    showToast('Effects cleared.');
+  });
+}
+</script>
+</body>
+</html>
