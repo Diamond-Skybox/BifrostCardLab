@@ -3,20 +3,20 @@
     {
       "name": "Cyberpunk",
       "id": "cyberpunk",
-      "url": "",
+      "url": "REPLACE_WITH_YOUR_DRIVE_URL/cyberpunk.pack.js",
       "effectCount": 22
     },
     {
       "name": "Elemental",
       "id": "elemental",
-      "url": "",
+      "url": "REPLACE_WITH_YOUR_DRIVE_URL/elemental.pack.js",
       "effectCount": 15
     },
     {
       "name": "ASCII Classics",
       "id": "ascii",
-      "url": "",
-      "effectCount": 17
+      "url": "REPLACE_WITH_YOUR_DRIVE_URL/ascii-classics.pack.js",
+      "effectCount": 18
     }
   ]
 }
