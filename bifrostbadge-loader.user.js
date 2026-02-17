@@ -11,8 +11,7 @@
 // @downloadURL  REPLACE_WITH_YOUR_DRIVE_URL/bifrostbadge-loader.user.js
 // @run-at       document-start
 // @grant        GM_xmlhttpRequest
-// @connect      drive-render.corp.amazon.com
-// @connect      drive.corp.amazon.com
+// @connect      REPLACE_WITH_YOUR_DRIVE_BASE_URL
 // ==/UserScript==
 
 (function () {
