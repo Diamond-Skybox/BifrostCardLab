@@ -1,0 +1,22 @@
+{
+  "packs": [
+    {
+      "name": "Cyberpunk",
+      "id": "cyberpunk",
+      "url": "",
+      "effectCount": 22
+    },
+    {
+      "name": "Elemental",
+      "id": "elemental",
+      "url": "",
+      "effectCount": 15
+    },
+    {
+      "name": "ASCII Classics",
+      "id": "ascii",
+      "url": "",
+      "effectCount": 17
+    }
+  ]
+}
