@@ -180,20 +180,24 @@
   // EFFECTS LAB (Blob URL)
   // ================================================================
 
-  function openEffectsLab(alias, photoUrl, name, currentShorthand) {
-    const labHTML = generateLabHTML(alias, photoUrl, name, currentShorthand);
+  async function openEffectsLab(alias, photoUrl, name, currentShorthand) {
+    // Engine + pack source was pre-fetched by the loader via GM_xmlhttpRequest
+    const bifrostData = window.__bifrostData || {};
+    const engineCode = bifrostData.engineSource || '';
+    const packCodes = bifrostData.packSources || [];
+
+    const labHTML = generateLabHTML(alias, photoUrl, name, currentShorthand, engineCode, packCodes);
     const blob = new Blob([labHTML], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
   }
 
-  function generateLabHTML(alias, photoUrl, name, currentShorthand) {
-    const bifrostData = window.__bifrostData || {};
-    const engineUrl = bifrostData.engineUrl || '';
-    const manifest = bifrostData.manifest || { packs: [] };
-    const packScriptTags = manifest.packs
-      .filter(p => p.url)
-      .map(p => `<script src="${p.url}"><\/script>`)
+  function generateLabHTML(alias, photoUrl, name, currentShorthand, engineCode, packCodes) {
+    // Escape </script> in source code so it doesn't break the blob HTML
+    const escape = (code) => code.replace(/<\/script>/gi, '<\\/script>');
+    const inlineScripts = [engineCode, ...packCodes]
+      .filter(Boolean)
+      .map(code => '<script>' + escape(code) + '<\/script>')
       .join('\n');
 
     return `<!DOCTYPE html>
@@ -321,9 +325,8 @@ body{background:#0a0a12;color:#eee;font-family:-apple-system,BlinkMacSystemFont,
 </div>
 <div class="toast" id="toast"></div>
 
-<!-- Load Bifrost engine + packs from corp drive -->
-<script src="${engineUrl}"><\/script>
-${packScriptTags}
+<!-- Bifrost engine + packs inlined -->
+${inlineScripts}
 
 <script>
 const ALIAS = '${alias}';
@@ -347,6 +350,7 @@ function computeWindowH() {
 }
 computeWindowH();
 new ResizeObserver(computeWindowH).observe(card);
+setTimeout(computeWindowH, 100);
 
 // Tilt
 boundary.addEventListener('mousemove', (e) => {
