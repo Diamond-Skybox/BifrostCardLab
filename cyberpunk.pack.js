@@ -508,11 +508,11 @@ Bifrost.registerPack({
       textClass: 'text-glow',
       icon: '💚',
       css: `
-        .text-glow .game-title {
+        .text-glow .game-title, .text-glow .bf-badge-name {
           text-shadow: 0 0 8px rgba(var(--text-glow-color, 0,255,136), 0.8),
                        0 0 20px rgba(var(--text-glow-color, 0,255,136), 0.4);
         }
-        .text-glow .platform-tag {
+        .text-glow .platform-tag, .text-glow .bf-badge-alias {
           text-shadow: 0 0 6px rgba(var(--text-glow-color, 0,255,136), 0.5);
         }
       `,
@@ -524,7 +524,7 @@ Bifrost.registerPack({
       textClass: 'text-glitch',
       icon: '👾',
       css: `
-        .text-glitch .game-title { animation: bfTextGlitch 3s ease-in-out infinite; }
+        .text-glitch .game-title, .text-glitch .bf-badge-name { animation: bfTextGlitch 3s ease-in-out infinite; }
         @keyframes bfTextGlitch {
           0%,91%,100% { transform: none; text-shadow: none; }
           92% { transform: translate(-2px, 1px) skewX(-2deg); text-shadow: 2px 0 #e94560, -2px 0 #54a0ff; }
@@ -543,7 +543,7 @@ Bifrost.registerPack({
       textClass: 'text-neon',
       icon: '💜',
       css: `
-        .text-neon .game-title {
+        .text-neon .game-title, .text-neon .bf-badge-name {
           color: rgba(var(--text-neon-color, 255,0,255), 1) !important;
           text-shadow: 0 0 5px rgba(var(--text-neon-color,255,0,255),0.8),
                        0 0 15px rgba(var(--text-neon-color,255,0,255),0.4),
@@ -561,7 +561,7 @@ Bifrost.registerPack({
       type: 'text',
       textClass: 'text-chromatic',
       icon: '🔴🔵',
-      css: `.text-chromatic .game-title { text-shadow: -1.5px 0 rgba(255,0,0,0.6), 1.5px 0 rgba(0,100,255,0.6); }`,
+      css: `.text-chromatic .game-title, .text-chromatic .bf-badge-name { text-shadow: -1.5px 0 rgba(255,0,0,0.6), 1.5px 0 rgba(0,100,255,0.6); }`,
     },
     'text-flicker': {
       name: 'Flicker',
@@ -570,7 +570,7 @@ Bifrost.registerPack({
       textClass: 'text-flicker',
       icon: '💡',
       css: `
-        .text-flicker .game-title { animation: bfTextFlicker 4s linear infinite; }
+        .text-flicker .game-title, .text-flicker .bf-badge-name { animation: bfTextFlicker 4s linear infinite; }
         @keyframes bfTextFlicker {
           0%,100% { opacity: 1; } 41% { opacity: 1; } 42% { opacity: 0.6; }
           43% { opacity: 1; } 44% { opacity: 0.2; } 45% { opacity: 1; }
@@ -585,7 +585,7 @@ Bifrost.registerPack({
       textClass: 'text-typewriter',
       icon: '⌨️',
       css: `
-        .text-typewriter .game-title {
+        .text-typewriter .game-title, .text-typewriter .bf-badge-name {
           overflow: hidden; white-space: nowrap;
           border-right: 2px solid rgba(var(--text-glow-color, 0,255,136), 0.8);
           animation: bfTypewriter 4s steps(20) infinite, bfBlink 0.8s step-end infinite;
@@ -601,8 +601,8 @@ Bifrost.registerPack({
       textClass: 'text-corrupt',
       icon: '📡',
       css: `
-        .text-corrupt .game-title { animation: bfTextCorrupt 4s infinite; }
-        .text-corrupt .platform-tag { animation: bfTextCorruptSub 4s infinite; }
+        .text-corrupt .game-title, .text-corrupt .bf-badge-name { animation: bfTextCorrupt 4s infinite; }
+        .text-corrupt .platform-tag, .text-corrupt .bf-badge-alias { animation: bfTextCorruptSub 4s infinite; }
         @keyframes bfTextCorrupt {
           0%,100% { text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff; transform: translate(0); }
           10% { text-shadow: 2px 0 #ff00ff, -2px 0 #00ffff; transform: translate(-2px, 0); }
