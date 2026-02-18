@@ -364,7 +364,8 @@ window.Bifrost = (() => {
       const zone = token.slice(dotIdx + 1);
 
       if (zone === 'text') {
-        toggleText(`text-${fxName}`);
+        const cls = fxName.startsWith('text-') ? fxName : `text-${fxName}`;
+        toggleText(cls);
         continue;
       }
 
