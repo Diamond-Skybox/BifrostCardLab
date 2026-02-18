@@ -58,12 +58,37 @@ window.Bifrost = (() => {
       def._cssInjected = true;
     }
 
-    // Create container
+    // --- TEXT EFFECTS ---
+    if (def.type === 'text' && def.textClass) {
+      const tz = (layers && layers.text) || document.getElementById('textZone');
+      if (tz) {
+        tz.classList.add(def.textClass);
+        const ctx = { container: null, card, zone: 'text', layer: tz, tiltState, interval: null, data: { _textClass: def.textClass } };
+        if (def.init) def.init(ctx);
+        active[key] = { ctx, packId: pack.id, effectId, zone: 'text' };
+      }
+      return;
+    }
+
+    // --- BORDER EFFECTS ---
+    if (def.type === 'border' || zone === 'border') {
+      const ctx = { container: null, card, zone: 'border', layer: card, tiltState, interval: null, data: {} };
+      if (def.className) {
+        card.classList.add(def.className);
+        ctx.data._className = def.className;
+      }
+      if (def.init) def.init(ctx);
+      active[key] = { ctx, packId: pack.id, effectId, zone: 'border' };
+      if (pack.onEffectChange) pack.onEffectChange(getPackActive(pack.id), active);
+      return;
+    }
+
+    // --- STANDARD EFFECTS ---
     const layer = getLayer(zone);
     const container = document.createElement('div');
     container.className = `bf-fx-container bf-${effectId.replace(/\./g, '-')}-${zone}`;
     container.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:inherit;';
-    const zi = { top: '6', mid: '3', bot: '1', border: '5' }[zone] || '3';
+    const zi = { top: '6', mid: '3', bot: '1' }[zone] || '3';
     container.style.zIndex = zi;
     layer.appendChild(container);
 
@@ -76,7 +101,6 @@ window.Bifrost = (() => {
       tiltState,
       interval: null,
       data: {},
-      // Helper to create child elements
       el(tag, className) {
         const e = document.createElement(tag);
         if (className) e.className = className;
@@ -85,17 +109,14 @@ window.Bifrost = (() => {
       }
     };
 
-    // Init
     if (def.init) {
       def.init(ctx);
     } else if (def.className) {
-      // CSS class-based effect (borders, etc)
       card.classList.add(def.className);
       ctx.data._className = def.className;
     }
     active[key] = { ctx, packId: pack.id, effectId, zone };
 
-    // Notify pack
     if (pack.onEffectChange) {
       pack.onEffectChange(getPackActive(pack.id), active);
     }
@@ -108,24 +129,31 @@ window.Bifrost = (() => {
 
     const { ctx, packId } = entry;
     const e = effects[effectId];
-    if (e && e.def.cleanup) e.def.cleanup(ctx);
 
-    // Clear common resources
-    if (ctx.interval) clearInterval(ctx.interval);
-    if (ctx.animFrame) cancelAnimationFrame(ctx.animFrame);
-    ctx.container.remove();
-    delete active[key];
+    // Text effect cleanup
+    if (ctx.data && ctx.data._textClass) {
+      const tz = (layers && layers.text) || document.getElementById('textZone');
+      if (tz) tz.classList.remove(ctx.data._textClass);
+    }
 
-    // Remove CSS class if applied to card
+    // Border className cleanup
     if (ctx.data && ctx.data._className) {
       card.classList.remove(ctx.data._className);
     }
+
+    // Standard cleanup
+    if (e && e.def.cleanup) e.def.cleanup(ctx);
+
+    if (ctx.interval) clearInterval(ctx.interval);
+    if (ctx.animFrame) cancelAnimationFrame(ctx.animFrame);
+    if (ctx.container) ctx.container.remove();
+    delete active[key];
+
     if (ctx._appliedClass) {
       const target = zone === 'border' || zone === 'card' ? card : getLayer(zone);
       target.classList.remove(ctx._appliedClass);
     }
 
-    // Notify pack
     const pack = packs[packId];
     if (pack && pack.onEffectChange) {
       pack.onEffectChange(getPackActive(packId), active);
