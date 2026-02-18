@@ -5,13 +5,14 @@
 
 /* Standalone activate button (shown when no HyperBadge) */
 .bifrost-activate-btn {
+  display: inline-block;
   margin-top: 8px;
-  padding: 8px 16px;
+  padding: 6px 14px;
   background: linear-gradient(135deg, #16213e, #0f3460);
   border: 1px solid #0f3460;
-  border-radius: 8px;
+  border-radius: 6px;
   color: #54a0ff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   text-align: center;
