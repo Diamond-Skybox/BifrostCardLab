@@ -183,32 +183,9 @@
   function openEffectsLab(alias, photoUrl, name, currentShorthand) {
     const bifrostData = window.__bifrostData || {};
     const root = bifrostData.root || '';
-
-    // Try to get a data URL from the already-loaded badge photo on this page
-    let imgUrl = photoUrl;
-    try {
-      // Find the badge photo that's already rendered on the phonetool page
-      const existingImg = document.querySelector('.bf-art-image') ||
-                          document.querySelector('img[src*="badgephoto"]') ||
-                          document.querySelector('.badge-photo img') ||
-                          document.querySelector('#badgePhoto');
-      if (existingImg && existingImg.naturalWidth > 0) {
-        const canvas = document.createElement('canvas');
-        canvas.width = existingImg.naturalWidth;
-        canvas.height = existingImg.naturalHeight;
-        canvas.getContext('2d').drawImage(existingImg, 0, 0);
-        imgUrl = canvas.toDataURL('image/jpeg', 0.85);
-        log('Photo converted to data URL (' + imgUrl.length + ' chars)');
-      } else {
-        log('No loaded badge image found on page, using raw URL');
-      }
-    } catch(e) {
-      log('Canvas conversion failed (likely tainted), using raw URL');
-    }
-
     const labUrl = root + '/lab.html'
       + '?alias=' + encodeURIComponent(alias)
-      + '&photo=' + encodeURIComponent(imgUrl)
+      + '&photo=' + encodeURIComponent(photoUrl)
       + '&name=' + encodeURIComponent(name.first + ' ' + name.last)
       + '&fx=' + encodeURIComponent(currentShorthand || '');
     window.open(labUrl, '_blank');
@@ -219,24 +196,36 @@
   // ================================================================
 
   function setupBroadcastListener(alias) {
+    // BroadcastChannel — works for same-origin tabs
     const channel = new BroadcastChannel(CONFIG.BROADCAST_CHANNEL);
     channel.addEventListener('message', (event) => {
-      const { type, alias: msgAlias, shorthand } = event.data;
-      if (msgAlias !== alias) return;
+      handleLabMessage(event.data, alias);
+    });
 
-      switch (type) {
-        case 'bifrost-save-local':
-          log('Saving local frame:', shorthand);
-          store.set('frame_' + alias, shorthand);
-          applyBifrostFrame(alias, shorthand);
-          break;
-        case 'bifrost-clear-local':
-          log('Clearing local frame');
-          store.remove('frame_' + alias);
-          removeBifrostFrame();
-          break;
+    // postMessage — works cross-origin (lab on drive-render -> phonetool)
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type && event.data.type.startsWith('bifrost-')) {
+        handleLabMessage(event.data, alias);
       }
     });
+  }
+
+  function handleLabMessage(data, alias) {
+    const { type, alias: msgAlias, shorthand } = data;
+    if (msgAlias !== alias) return;
+
+    switch (type) {
+      case 'bifrost-save-local':
+        log('Saving local frame:', shorthand);
+        store.set('frame_' + alias, shorthand);
+        applyBifrostFrame(alias, shorthand);
+        break;
+      case 'bifrost-clear-local':
+        log('Clearing local frame');
+        store.remove('frame_' + alias);
+        removeBifrostFrame();
+        break;
+    }
   }
 
   // ================================================================
