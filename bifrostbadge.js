@@ -183,12 +183,52 @@
   function openEffectsLab(alias, photoUrl, name, currentShorthand) {
     const bifrostData = window.__bifrostData || {};
     const root = bifrostData.root || '';
-    const labUrl = root + '/lab.html'
-      + '?alias=' + encodeURIComponent(alias)
-      + '&photo=' + encodeURIComponent(photoUrl)
-      + '&name=' + encodeURIComponent(name.first + ' ' + name.last)
-      + '&fx=' + encodeURIComponent(currentShorthand || '');
-    window.open(labUrl, '_blank');
+
+    // Try to convert badge photo to data URL so lab can display it cross-origin
+    function openLab(imgUrl) {
+      const labUrl = root + '/lab.html'
+        + '?alias=' + encodeURIComponent(alias)
+        + '&photo=' + encodeURIComponent(imgUrl)
+        + '&name=' + encodeURIComponent(name.first + ' ' + name.last)
+        + '&fx=' + encodeURIComponent(currentShorthand || '');
+      window.open(labUrl, '_blank');
+    }
+
+    // Attempt canvas-based conversion (works if image is same-origin or CORS-enabled)
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function() {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext('2d').drawImage(img, 0, 0);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          log('Photo converted to data URL (' + dataUrl.length + ' chars)');
+          openLab(dataUrl);
+        } catch(e) {
+          log('Canvas tainted, using raw URL');
+          openLab(photoUrl);
+        }
+      };
+      img.onerror = function() {
+        log('Photo load failed, using raw URL');
+        openLab(photoUrl);
+      };
+      // Timeout fallback — don't wait forever
+      setTimeout(function() {
+        if (!img.complete) {
+          log('Photo load timeout, using raw URL');
+          img.onload = null;
+          img.onerror = null;
+          openLab(photoUrl);
+        }
+      }, 3000);
+      img.src = photoUrl;
+    } catch(e) {
+      openLab(photoUrl);
+    }
   }
 
   // ================================================================
