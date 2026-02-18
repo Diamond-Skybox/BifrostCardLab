@@ -176,6 +176,8 @@ const LAB_CONFIG = {
     artImg.onload = function() {
       document.getElementById('artPlaceholder').style.display = 'none';
       console.log('[Lab] Photo loaded');
+      // Recompute card layout now that image is ready
+      computeWindowH();
     };
     artImg.onerror = function() {
       // First attempt may fail but primes auth cookies via redirect
@@ -204,6 +206,7 @@ const LAB_CONFIG = {
   function computeWindowH() {
     const padding = 10;
     const textZoneH = 52;
+    const artMargin = 11;
     const winW = card.offsetWidth - padding * 2;
     if (winW <= 0) {
       console.log('[Lab] computeWindowH: card not laid out yet, width=' + card.offsetWidth);
@@ -214,6 +217,22 @@ const LAB_CONFIG = {
     // Explicitly set card height to ensure text zone has room
     const totalH = padding + winH + textZoneH + padding;
     card.style.height = totalH + 'px';
+    // Force art image dimensions explicitly as backup
+    var img = document.getElementById('artImage');
+    if (img) {
+      img.style.top = (padding - artMargin) + 'px';
+      img.style.left = (padding - artMargin) + 'px';
+      img.style.width = (winW + artMargin * 2) + 'px';
+      img.style.height = (winH + artMargin * 2) + 'px';
+    }
+    // Force placeholder dimensions too
+    var ph = document.getElementById('artPlaceholder');
+    if (ph) {
+      ph.style.top = padding + 'px';
+      ph.style.left = padding + 'px';
+      ph.style.width = winW + 'px';
+      ph.style.height = winH + 'px';
+    }
     console.log('[Lab] computeWindowH: winW=' + winW + ', winH=' + winH + ', totalH=' + totalH);
   }
   // Multiple timing strategies to ensure it fires after layout
