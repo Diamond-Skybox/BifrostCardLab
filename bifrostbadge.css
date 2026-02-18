@@ -167,7 +167,7 @@
   );
 }
 
-.bf-badge:hover .bf-gloss-overlay {
+.bf-badge.has-gloss:hover .bf-gloss-overlay {
   opacity: 1;
 }
 
