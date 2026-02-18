@@ -276,7 +276,8 @@ Bifrost.registerPack({
     'text-shadow-rise': {
       name: 'Shadow Rise', category: 'text', type: 'text', textClass: 'text-shadow-rise', icon: '🌅',
       css: `.text-shadow-rise .game-title, .text-shadow-rise .bf-badge-name { animation:bfShadowRise 3s ease-in-out infinite; }
-        @keyframes bfShadowRise { 0%,100%{text-shadow:0 2px 4px rgba(0,0,0,0.3)} 50%{text-shadow:0 6px 12px rgba(0,0,0,0.5),0 0 20px rgba(100,200,255,0.15)} }`,
+        .text-shadow-rise .platform-tag, .text-shadow-rise .bf-badge-alias { animation:bfShadowRise 3s ease-in-out infinite 0.2s; }
+        @keyframes bfShadowRise { 0%,100%{text-shadow:0 1px 3px rgba(0,0,0,0.4);transform:translateY(0)} 50%{text-shadow:0 8px 20px rgba(0,0,0,0.6),0 0 30px rgba(100,180,255,0.3),0 0 60px rgba(100,180,255,0.1);transform:translateY(-2px)} }`,
     },
     'text-rainbow': {
       name: 'Rainbow', category: 'text', type: 'text', textClass: 'text-rainbow', icon: '🌈',
