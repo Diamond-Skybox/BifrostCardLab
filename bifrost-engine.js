@@ -196,6 +196,7 @@ window.Bifrost = (() => {
   // ============================================================
   function toggleText(cls) {
     const tz = (layers && layers.text) || document.getElementById('textZone');
+    console.log(`[Bifrost] toggleText('${cls}'), textZone:`, tz, 'layers.text:', layers?.text);
     if (!tz) return;
     if (activeText.has(cls)) {
       tz.classList.remove(cls);
