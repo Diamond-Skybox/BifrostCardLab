@@ -318,7 +318,7 @@
     boundary.id = 'bifrost-badge-card';
 
     boundary.innerHTML = `
-      <div class="bf-badge">
+      <div class="bf-badge has-gloss">
         <div class="bf-badge-sizer"></div>
         <div class="bf-layer-bottom">
           <img class="bf-art-image" src="${photoUrl}" alt="${name.first} ${name.last}" />
@@ -348,9 +348,23 @@
 
     const update = () => {
       const padding = 10; // --frame-padding
+      const textZoneH = 52; // --text-zone-h
+      const artMargin = 11; // --art-margin
       const winW = card.offsetWidth - padding * 2;
+      if (winW <= 0) return;
       const winH = winW * (4 / 3); // 3:4 ratio
       card.style.setProperty('--window-h', `${winH}px`);
+      // Explicit height to ensure text zone fits
+      const totalH = padding + winH + textZoneH + padding;
+      card.style.height = `${totalH}px`;
+      // Explicit image dimensions as backup
+      const img = card.querySelector('.bf-art-image');
+      if (img) {
+        img.style.top = (padding - artMargin) + 'px';
+        img.style.left = (padding - artMargin) + 'px';
+        img.style.width = (winW + artMargin * 2) + 'px';
+        img.style.height = (winH + artMargin * 2) + 'px';
+      }
     };
 
     update();
