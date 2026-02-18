@@ -180,14 +180,24 @@ const LAB_CONFIG = {
   function computeWindowH() {
     const padding = 10;
     const winW = card.offsetWidth - padding * 2;
-    if (winW <= 0) return; // not laid out yet
+    if (winW <= 0) {
+      console.log('[Lab] computeWindowH: card not laid out yet, width=' + card.offsetWidth);
+      return;
+    }
     const winH = winW * (4/3);
     card.style.setProperty('--window-h', winH + 'px');
+    console.log('[Lab] computeWindowH: winW=' + winW + ', winH=' + winH);
   }
+  // Multiple timing strategies to ensure it fires after layout
   computeWindowH();
+  requestAnimationFrame(computeWindowH);
+  requestAnimationFrame(function() { requestAnimationFrame(computeWindowH); });
+  setTimeout(computeWindowH, 50);
+  setTimeout(computeWindowH, 200);
+  setTimeout(computeWindowH, 500);
   new ResizeObserver(computeWindowH).observe(card);
-  setTimeout(computeWindowH, 100);
   window.addEventListener('load', computeWindowH);
+  window.addEventListener('DOMContentLoaded', computeWindowH);
 
   // Tilt
   boundary.addEventListener('mousemove', function(e) {
