@@ -184,51 +184,34 @@
     const bifrostData = window.__bifrostData || {};
     const root = bifrostData.root || '';
 
-    // Try to convert badge photo to data URL so lab can display it cross-origin
-    function openLab(imgUrl) {
-      const labUrl = root + '/lab.html'
-        + '?alias=' + encodeURIComponent(alias)
-        + '&photo=' + encodeURIComponent(imgUrl)
-        + '&name=' + encodeURIComponent(name.first + ' ' + name.last)
-        + '&fx=' + encodeURIComponent(currentShorthand || '');
-      window.open(labUrl, '_blank');
+    // Try to get a data URL from the already-loaded badge photo on this page
+    let imgUrl = photoUrl;
+    try {
+      // Find the badge photo that's already rendered on the phonetool page
+      const existingImg = document.querySelector('.bf-art-image') ||
+                          document.querySelector('img[src*="badgephoto"]') ||
+                          document.querySelector('.badge-photo img') ||
+                          document.querySelector('#badgePhoto');
+      if (existingImg && existingImg.naturalWidth > 0) {
+        const canvas = document.createElement('canvas');
+        canvas.width = existingImg.naturalWidth;
+        canvas.height = existingImg.naturalHeight;
+        canvas.getContext('2d').drawImage(existingImg, 0, 0);
+        imgUrl = canvas.toDataURL('image/jpeg', 0.85);
+        log('Photo converted to data URL (' + imgUrl.length + ' chars)');
+      } else {
+        log('No loaded badge image found on page, using raw URL');
+      }
+    } catch(e) {
+      log('Canvas conversion failed (likely tainted), using raw URL');
     }
 
-    // Attempt canvas-based conversion (works if image is same-origin or CORS-enabled)
-    try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = function() {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          canvas.getContext('2d').drawImage(img, 0, 0);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          log('Photo converted to data URL (' + dataUrl.length + ' chars)');
-          openLab(dataUrl);
-        } catch(e) {
-          log('Canvas tainted, using raw URL');
-          openLab(photoUrl);
-        }
-      };
-      img.onerror = function() {
-        log('Photo load failed, using raw URL');
-        openLab(photoUrl);
-      };
-      // Timeout fallback — don't wait forever
-      setTimeout(function() {
-        if (!img.complete) {
-          log('Photo load timeout, using raw URL');
-          img.onload = null;
-          img.onerror = null;
-          openLab(photoUrl);
-        }
-      }, 3000);
-      img.src = photoUrl;
-    } catch(e) {
-      openLab(photoUrl);
-    }
+    const labUrl = root + '/lab.html'
+      + '?alias=' + encodeURIComponent(alias)
+      + '&photo=' + encodeURIComponent(imgUrl)
+      + '&name=' + encodeURIComponent(name.first + ' ' + name.last)
+      + '&fx=' + encodeURIComponent(currentShorthand || '');
+    window.open(labUrl, '_blank');
   }
 
   // ================================================================
