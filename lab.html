@@ -270,7 +270,12 @@ const LAB_CONFIG = {
 // ============================================================
 function initLab(alias, initialFx, tiltState) {
   const card = document.getElementById('previewCard');
-  const channel = new BroadcastChannel(LAB_CONFIG.BROADCAST_CHANNEL);
+  // Send message to phonetool tab via postMessage (cross-origin safe)
+  function sendToPhoneTool(data) {
+    if (window.opener) {
+      window.opener.postMessage(data, '*');
+    }
+  }
   const selections = new Map();
   let currentShorthand = initialFx || '';
 
@@ -609,8 +614,8 @@ function initLab(alias, initialFx, tiltState) {
   });
 
   document.getElementById('btnSave').addEventListener('click', function() {
-    channel.postMessage({ type: 'bifrost-save-local', alias: alias, shorthand: currentShorthand });
-    showToast('Saved locally! Effect applied on badge page.');
+    sendToPhoneTool({ type: 'bifrost-save-local', alias: alias, shorthand: currentShorthand });
+    showToast('Saved! Badge updated on phonetool page.');
   });
 
   document.getElementById('btnCopy').addEventListener('click', function() {
@@ -639,7 +644,7 @@ function initLab(alias, initialFx, tiltState) {
     document.querySelectorAll('.effect-btn.active').forEach(function(b) { b.classList.remove('active'); });
     document.querySelectorAll('.ascii-play-btn').forEach(function(b) { b.textContent = '▶ Play'; b.classList.remove('active'); });
     document.getElementById('shorthandDisplay').value = 'No effects selected';
-    channel.postMessage({ type: 'bifrost-clear-local', alias: alias });
+    sendToPhoneTool({ type: 'bifrost-clear-local', alias: alias });
     showToast('Effects cleared.');
   });
 }
