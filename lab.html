@@ -168,8 +168,30 @@ const LAB_CONFIG = {
   // Populate the card
   document.getElementById('subtitle').innerHTML =
     'Customizing badge for <span class="alias">@' + ALIAS + '</span> &mdash; ' + NAME;
-  document.getElementById('artImage').src = PHOTO;
   document.getElementById('artImage').alt = NAME;
+  
+  // Load badge photo — prime auth cookies first, then load image
+  var artImg = document.getElementById('artImage');
+  function loadPhoto() {
+    artImg.onload = function() {
+      document.getElementById('artPlaceholder').style.display = 'none';
+      console.log('[Lab] Photo loaded');
+    };
+    artImg.onerror = function() {
+      // First attempt may fail but primes auth cookies via redirect
+      // Retry once after a short delay
+      console.log('[Lab] Photo failed, retrying in 1.5s...');
+      artImg.onerror = function() {
+        console.log('[Lab] Photo failed on retry');
+        artImg.style.display = 'none';
+      };
+      setTimeout(function() {
+        artImg.src = PHOTO;
+      }, 1500);
+    };
+    artImg.src = PHOTO;
+  }
+  if (PHOTO) loadPhoto();
   document.getElementById('badgeName').textContent = NAME;
   document.getElementById('badgeAlias').textContent = '@' + ALIAS;
   if (FX) document.getElementById('shorthandDisplay').value = FX;
@@ -272,9 +294,13 @@ function initLab(alias, initialFx, tiltState) {
   const card = document.getElementById('previewCard');
   // Send message to phonetool tab via postMessage (cross-origin safe)
   function sendToPhoneTool(data) {
-    if (window.opener) {
-      window.opener.postMessage(data, '*');
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage(data, '*');
+        return true;
+      } catch(e) {}
     }
+    return false;
   }
   const selections = new Map();
   let currentShorthand = initialFx || '';
@@ -614,8 +640,20 @@ function initLab(alias, initialFx, tiltState) {
   });
 
   document.getElementById('btnSave').addEventListener('click', function() {
-    sendToPhoneTool({ type: 'bifrost-save-local', alias: alias, shorthand: currentShorthand });
-    showToast('Saved! Badge updated on phonetool page.');
+    var sent = sendToPhoneTool({ type: 'bifrost-save-local', alias: alias, shorthand: currentShorthand });
+    if (sent) {
+      showToast('Saved! Badge updated on phonetool page.');
+    } else {
+      // Opener lost (page was reloaded) — copy console command instead
+      var cmd = "localStorage.setItem('bifrost_frame_" + alias + "', '" + currentShorthand + "')";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cmd).then(function() {
+          showToast('Phonetool connection lost. Save command copied — paste in phonetool console.');
+        });
+      } else {
+        showToast('Phonetool connection lost. Re-open lab from phonetool to save.');
+      }
+    }
   });
 
   document.getElementById('btnCopy').addEventListener('click', function() {
@@ -645,7 +683,7 @@ function initLab(alias, initialFx, tiltState) {
     document.querySelectorAll('.ascii-play-btn').forEach(function(b) { b.textContent = '▶ Play'; b.classList.remove('active'); });
     document.getElementById('shorthandDisplay').value = 'No effects selected';
     sendToPhoneTool({ type: 'bifrost-clear-local', alias: alias });
-    showToast('Effects cleared.');
+    showToast('Effects cleared.' + (!window.opener || window.opener.closed ? ' Re-open lab from phonetool to sync.' : ''));
   });
 }
 </script>
