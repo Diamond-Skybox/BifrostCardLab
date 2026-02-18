@@ -47,7 +47,6 @@ window.Bifrost = (() => {
     const entry = effects[effectId];
     if (!entry) { console.warn(`[Bifrost] Unknown effect: ${effectId}`); return; }
     const { pack, def } = entry;
-    console.log(`[Bifrost] Activating ${effectId}.${zone} (type: ${def.type || 'standard'}, hasInit: ${!!def.init}, hasCss: ${!!def.css})`);
 
     // Lazy CSS injection
     if (!def._cssInjected && def.css) {
@@ -177,6 +176,8 @@ window.Bifrost = (() => {
       const { effectId, zone } = active[key];
       deactivate(effectId, zone);
     }
+    // Clear gloss
+    if (card) card.classList.remove('has-gloss');
     // Clear text effects
     const tz = (layers && layers.text) || document.getElementById('textZone');
     if (tz) {
@@ -196,7 +197,6 @@ window.Bifrost = (() => {
   // ============================================================
   function toggleText(cls) {
     const tz = (layers && layers.text) || document.getElementById('textZone');
-    console.log(`[Bifrost] toggleText('${cls}'), textZone:`, tz, 'layers.text:', layers?.text);
     if (!tz) return;
     if (activeText.has(cls)) {
       tz.classList.remove(cls);
@@ -311,7 +311,8 @@ window.Bifrost = (() => {
   // SHORTHAND
   // ============================================================
   function buildShorthand() {
-    const parts = ['tilt', 'parallax', 'gloss.top'];
+    const parts = ['tilt', 'parallax'];
+    if (card && card.classList.contains('has-gloss')) parts.push('gloss.top');
     for (const key of Object.keys(active)) {
       const { effectId, zone } = active[key];
       parts.push(`${effectId}.${zone}`);
@@ -331,10 +332,13 @@ window.Bifrost = (() => {
     const raw = str.trim();
     const s = raw.startsWith('fx:') ? raw.slice(3) : raw;
     const tokens = s.split(',').map(t => t.trim()).filter(Boolean);
-    console.log(`[Bifrost] Applying shorthand: ${tokens.length} tokens`, tokens);
 
     for (const token of tokens) {
-      if (['tilt', 'parallax', 'gloss.top'].includes(token)) continue;
+      if (['tilt', 'parallax'].includes(token)) continue;
+      if (token === 'gloss.top' || token === 'gloss') {
+        if (card) card.classList.add('has-gloss');
+        continue;
+      }
 
       // ASCII
       if (token.startsWith('ascii:')) {
