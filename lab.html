@@ -25,7 +25,7 @@ body{background:#0a0a12;color:#eee;font-family:-apple-system,BlinkMacSystemFont,
   --parallax-x:0px;--parallax-y:0px;
   --frame-color:#16213e;--frame-accent:#0f3460;--border-color:#0f3460;--border-width:2px;
   --frame-padding:10px;--card-radius:12px;--art-margin:11px;--window-h:0px;--text-zone-h:52px;
-  width:200px;position:relative;overflow:hidden;cursor:pointer;
+  width:180px;position:relative;overflow:hidden;cursor:pointer;
   border-radius:var(--card-radius);border:var(--border-width) solid var(--border-color);
   background:var(--frame-color);
   transform:perspective(1000px) rotateX(var(--rotateX)) rotateY(var(--rotateY));
@@ -43,8 +43,8 @@ body{background:#0a0a12;color:#eee;font-family:-apple-system,BlinkMacSystemFont,
 .bf-gloss-overlay{position:absolute;inset:0;border-radius:var(--card-radius);pointer-events:none;z-index:5;opacity:0;transition:opacity 0.3s ease;background:radial-gradient(circle at var(--glossX) var(--glossY),rgba(255,255,255,0.2) 0%,rgba(255,255,255,0.08) 25%,transparent 50%)}
 .bf-badge:hover .bf-gloss-overlay{opacity:1}
 .bf-text-zone{position:absolute;bottom:0;left:0;right:0;padding:8px var(--frame-padding) var(--frame-padding);text-align:center;z-index:6}
-.bf-badge-name{font-size:0.85rem;font-weight:600;color:#eee;line-height:1.2}
-.bf-badge-alias{font-size:0.7rem;color:#888;margin-top:2px;font-family:monospace}
+.bf-badge-name{font-size:0.95rem;font-weight:600;color:#eee;line-height:1.2}
+.bf-badge-alias{font-size:0.75rem;color:#888;margin-top:2px;font-family:monospace}
 
 /* Controls */
 .pack-toggle{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0.75rem;background:#0d0d1a;border:1px solid #333;border-radius:6px;margin-bottom:0.5rem;cursor:pointer;transition:border-color 0.2s}
@@ -63,14 +63,20 @@ body{background:#0a0a12;color:#eee;font-family:-apple-system,BlinkMacSystemFont,
 .effect-btn{padding:0.4rem 0.5rem;background:#0d0d1a;border:1px solid #333;border-radius:6px;color:#ccc;font-size:0.75rem;cursor:pointer;transition:all 0.2s;text-align:center;user-select:none}
 .effect-btn:hover{border-color:#54a0ff;color:#fff}
 .effect-btn.active{border-color:#e94560;background:rgba(233,69,96,0.1);color:#e94560}
-.shorthand-display{background:#0d0d1a;border:1px solid #333;border-radius:6px;padding:0.75rem;font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#00ff88;word-break:break-all;min-height:2.5rem}
+.shorthand-display{background:#0d0d1a;border:1px solid #333;border-radius:6px;padding:0.75rem;font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#00ff88;word-break:break-all;min-height:2.5rem;width:100%;resize:vertical;cursor:text;outline:none}
+.shorthand-display:focus{border-color:#00ff88}
+.preset-btn{border-color:#f59e0b !important;color:#f59e0b !important;background:rgba(245,158,11,0.05) !important}
+.preset-btn:hover{background:rgba(245,158,11,0.15) !important}
+.preset-btn.active{background:rgba(245,158,11,0.2) !important}
 .action-buttons{display:flex;gap:0.75rem;margin-top:1rem}
 .action-btn{flex:1;padding:0.75rem 1rem;border:1px solid;border-radius:8px;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.2s;text-align:center;user-select:none}
 .action-btn.save{background:rgba(0,255,136,0.1);border-color:#00ff88;color:#00ff88}
 .action-btn.save:hover{background:rgba(0,255,136,0.2);box-shadow:0 0 12px rgba(0,255,136,0.3)}
+.action-btn.apply{background:rgba(245,158,11,0.1);border-color:#f59e0b;color:#f59e0b}
+.action-btn.apply:hover{background:rgba(245,158,11,0.2);box-shadow:0 0 12px rgba(245,158,11,0.3)}
 .action-btn.copy{background:rgba(84,160,255,0.1);border-color:#54a0ff;color:#54a0ff}
 .action-btn.copy:hover{background:rgba(84,160,255,0.2);box-shadow:0 0 12px rgba(84,160,255,0.3)}
-.action-btn.clear{background:rgba(233,69,96,0.1);border-color:#e94560;color:#e94560;flex:0.5}
+.action-btn.clear{background:rgba(233,69,96,0.1);border-color:#e94560;color:#e94560;flex:0.3}
 .action-btn.clear:hover{background:rgba(233,69,96,0.2)}
 .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(100px);background:#16213e;border:1px solid #00ff88;color:#00ff88;padding:0.75rem 1.5rem;border-radius:8px;font-size:0.85rem;transition:transform 0.3s ease;z-index:999}
 .toast.show{transform:translateX(-50%) translateY(0)}
@@ -121,11 +127,12 @@ body{background:#0a0a12;color:#eee;font-family:-apple-system,BlinkMacSystemFont,
     </div>
     <div class="section">
       <h3>Current Shorthand</h3>
-      <div class="shorthand-display" id="shorthandDisplay">No effects selected</div>
+      <textarea class="shorthand-display" id="shorthandDisplay" rows="2" spellcheck="false">No effects selected</textarea>
       <div class="action-buttons">
-        <div class="action-btn save" id="btnSave">Apply Locally</div>
-        <div class="action-btn copy" id="btnCopy">Copy for Slack</div>
-        <div class="action-btn clear" id="btnClear">Clear</div>
+        <div class="action-btn apply" id="btnApply">▶ Apply</div>
+        <div class="action-btn save" id="btnSave">💾 Save</div>
+        <div class="action-btn copy" id="btnCopy">📋 Copy</div>
+        <div class="action-btn clear" id="btnClear">✕</div>
       </div>
     </div>
   </div>
@@ -163,7 +170,7 @@ const LAB_CONFIG = {
   document.getElementById('artImage').alt = NAME;
   document.getElementById('badgeName').textContent = NAME;
   document.getElementById('badgeAlias').textContent = '@' + ALIAS;
-  if (FX) document.getElementById('shorthandDisplay').textContent = FX;
+  if (FX) document.getElementById('shorthandDisplay').value = FX;
 
   // ---- Card preview setup ----
   const card = document.getElementById('previewCard');
@@ -443,6 +450,61 @@ function initLab(alias, initialFx, tiltState) {
         effectsDiv.appendChild(asciiControls);
       }
 
+      // ---- PRESETS ----
+      if (pack.presets && Object.keys(pack.presets).length > 0) {
+        var presetLabel = document.createElement('div');
+        presetLabel.className = 'cat-label';
+        presetLabel.textContent = '⚡ Presets';
+        effectsDiv.appendChild(presetLabel);
+
+        var presetGrid = document.createElement('div');
+        presetGrid.className = 'effects-grid';
+
+        (function(pack) {
+          Object.entries(pack.presets).forEach(function(entry) {
+            var presetName = entry[0], fxList = entry[1];
+            var btn = document.createElement('div');
+            btn.className = 'effect-btn preset-btn';
+            btn.textContent = '⚡ ' + presetName;
+            btn.addEventListener('click', function() {
+              // Clear everything first
+              selections.clear();
+              if (Bifrost) Bifrost.deactivateAll();
+              document.querySelectorAll('.effect-btn.active').forEach(function(b) { b.classList.remove('active'); });
+
+              // Apply each effect in the preset
+              fxList.forEach(function(fxStr) {
+                var dotIdx = fxStr.lastIndexOf('.');
+                var fxId = fxStr.slice(0, dotIdx);
+                var zone = fxStr.slice(dotIdx + 1);
+                if (zone === 'text') {
+                  if (Bifrost) Bifrost.toggleText('text-' + fxId);
+                  selections.set(fxId + '-text', 'text');
+                } else if (zone === 'border') {
+                  if (Bifrost) Bifrost.activateBorder(fxId, 'border');
+                  selections.set(fxId + '-border', 'border');
+                } else {
+                  if (Bifrost) Bifrost.activate(fxId, zone);
+                  selections.set(fxId + '-' + zone, zone);
+                }
+              });
+
+              // Sync button states
+              document.querySelectorAll('.effect-btn[data-fx-id]').forEach(function(b) {
+                var key = b.dataset.fxId + '-' + (b.dataset.zone || 'mid');
+                b.classList.toggle('active', selections.has(key));
+              });
+
+              btn.classList.add('active');
+              updateShorthand();
+            });
+            presetGrid.appendChild(btn);
+          });
+        })(pack);
+
+        effectsDiv.appendChild(presetGrid);
+      }
+
       // Toggle click handler
       (function(packId) {
         toggle.addEventListener('click', function() {
@@ -489,7 +551,7 @@ function initLab(alias, initialFx, tiltState) {
       }
     });
     currentShorthand = parts.join(',');
-    document.getElementById('shorthandDisplay').textContent = currentShorthand || 'No effects selected';
+    document.getElementById('shorthandDisplay').value = currentShorthand || 'No effects selected';
   }
 
   // ---- Toast ----
@@ -501,6 +563,35 @@ function initLab(alias, initialFx, tiltState) {
   }
 
   // ---- Actions ----
+  document.getElementById('btnApply').addEventListener('click', function() {
+    var raw = document.getElementById('shorthandDisplay').value.trim();
+    if (!raw || raw === 'No effects selected') return;
+    selections.clear();
+    document.querySelectorAll('.effect-btn.active').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.ascii-play-btn').forEach(function(b) { b.textContent = '▶ Play'; b.classList.remove('active'); });
+    if (Bifrost) {
+      Bifrost.applyShorthand(raw);
+      // Rebuild selections from active state
+      Object.entries(Bifrost.active).forEach(function(entry) {
+        var key = entry[0];
+        var info = entry[1];
+        selections.set(key, info.zone);
+        // Sync button states
+        document.querySelectorAll('.effect-btn[data-fx-id]').forEach(function(b) {
+          if (b.dataset.fxId === info.effectId && b.dataset.zone === info.zone) b.classList.add('active');
+        });
+      });
+      // Sync text effects
+      if (Bifrost.activeText) {
+        Bifrost.activeText.forEach(function(cls) {
+          selections.set(cls + '-text', 'text');
+        });
+      }
+    }
+    currentShorthand = raw;
+    showToast('Shorthand applied!');
+  });
+
   document.getElementById('btnSave').addEventListener('click', function() {
     channel.postMessage({ type: 'bifrost-save-local', alias: alias, shorthand: currentShorthand });
     showToast('Saved locally! Effect applied on badge page.');
@@ -531,7 +622,7 @@ function initLab(alias, initialFx, tiltState) {
     if (Bifrost) Bifrost.deactivateAll();
     document.querySelectorAll('.effect-btn.active').forEach(function(b) { b.classList.remove('active'); });
     document.querySelectorAll('.ascii-play-btn').forEach(function(b) { b.textContent = '▶ Play'; b.classList.remove('active'); });
-    document.getElementById('shorthandDisplay').textContent = 'No effects selected';
+    document.getElementById('shorthandDisplay').value = 'No effects selected';
     channel.postMessage({ type: 'bifrost-clear-local', alias: alias });
     showToast('Effects cleared.');
   });
