@@ -133,7 +133,7 @@
     const a = document.createElement('a');
     a.className = 'Button';
     a.href = '#';
-    a.innerHTML = `<span class="Icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 0L9.5 5.5L16 8L9.5 10.5L8 16L6.5 10.5L0 8L6.5 5.5L8 0Z" fill="currentColor"/></svg></span>BifrostBadge`;
+    a.innerHTML = `BifrostBadge<span class="Icon"></span>`;
     a.addEventListener('click', (e) => {
       e.preventDefault();
       onClick();
@@ -261,7 +261,7 @@
       }
     }
 
-    // Build card DOM
+    // Build card DOM — renders immediately with photo, frame, tilt
     const card = buildBifrostCard(photoUrl, name, alias);
 
     // Insert into page
@@ -280,14 +280,21 @@
 
     bifrostCardEl = card;
 
-    // Set up tilt/parallax
+    // Set up tilt/parallax immediately — card is interactive right away
     const tiltState = setupTilt(card);
 
     // Compute window height after card is in DOM
     computeWindowH(card);
 
-    // Initialize Bifrost engine with the card's layers
-    if (window.Bifrost) {
+    log('Card injected');
+
+    // Apply effects once engine is available
+    applyEffectsWhenReady(card, tiltState, shorthand);
+  }
+
+  function applyEffectsWhenReady(card, tiltState, shorthand) {
+    if (window.Bifrost && Object.keys(Bifrost.packs).length > 0) {
+      // Engine ready — apply now
       const badgeEl = card.querySelector('.bf-badge');
       const layerEls = {
         top: card.querySelector('.bf-layer-top'),
@@ -302,10 +309,29 @@
       }
       log('Bifrost engine initialized with', Object.keys(Bifrost.packs).length, 'packs');
     } else {
-      log('Bifrost engine not loaded — card rendered without effects');
+      // Engine not loaded yet — poll until ready
+      log('Waiting for Bifrost engine...');
+      let attempts = 0;
+      const poll = setInterval(() => {
+        attempts++;
+        if (window.Bifrost && Object.keys(Bifrost.packs).length > 0) {
+          clearInterval(poll);
+          const badgeEl = card.querySelector('.bf-badge');
+          const layerEls = {
+            top: card.querySelector('.bf-layer-top'),
+            mid: card.querySelector('.bf-layer-mid'),
+            bot: card.querySelector('.bf-layer-bottom'),
+            text: card.querySelector('.bf-text-zone'),
+          };
+          Bifrost.init(badgeEl, layerEls, tiltState, null);
+          if (shorthand) Bifrost.applyShorthand(shorthand);
+          log('Bifrost engine initialized (after', attempts * 200 + 'ms wait),', Object.keys(Bifrost.packs).length, 'packs');
+        } else if (attempts > 50) { // 10 second timeout
+          clearInterval(poll);
+          log('Bifrost engine failed to load after 10s');
+        }
+      }, 200);
     }
-
-    log('Card injected');
   }
 
   /**
@@ -508,7 +534,7 @@
   // STARTUP — delay to let HyperBadge inject first
   // ================================================================
 
-  function start() { setTimeout(init, 1500); }
+  function start() { setTimeout(init, 500); }
 
   if (document.readyState === 'complete') {
     start();
