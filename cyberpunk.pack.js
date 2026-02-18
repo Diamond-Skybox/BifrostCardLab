@@ -187,60 +187,77 @@ Bifrost.registerPack({
           position: absolute; left: 0; right: 0;
           overflow: hidden; pointer-events: none;
         }
-        @keyframes bfGlitchFrameShift {
-          0%,90%,100% { transform: none; opacity: 0; }
-          91% { transform: translateX(-4px) skewX(-1deg); opacity: 0.7; }
-          92% { transform: translateX(6px) skewX(2deg); opacity: 0.5; }
-          93% { transform: translateX(-2px); opacity: 0.8; }
-          94% { transform: none; opacity: 0; }
-          96% { transform: translateX(3px) skewX(-1deg); opacity: 0.6; }
-          97% { transform: none; opacity: 0; }
-        }
-        @keyframes bfGlitchImageTear {
-          0%,87%,100% { clip-path: none; transform: none; filter: none; }
-          88% { clip-path: inset(15% 0 80% 0); transform: translateX(-8px); filter: saturate(2) hue-rotate(20deg); }
-          89% { clip-path: inset(40% 0 50% 0); transform: translateX(12px); filter: saturate(1.5) hue-rotate(-15deg); }
-          90% { clip-path: inset(65% 0 25% 0); transform: translateX(-5px); filter: saturate(2.5); }
-          91% { clip-path: none; transform: none; filter: none; }
-          93% { clip-path: inset(25% 0 65% 0); transform: translateX(6px); filter: hue-rotate(30deg); }
-          94% { clip-path: none; transform: none; filter: none; }
-        }
       `,
       init(ctx) {
         if (ctx.zone === 'card') {
-          // Card-level glitch — inject a dynamic keyframe on the card
+          // Full card glitch — chromatic shift + jitter on the whole card
           const card = ctx.card;
-          const t1 = 85 + Math.random()*5, t2 = t1+0.5, t3 = t1+1, t4 = t1+2, t5 = t1+3, t6 = t1+4;
+          const id = 'bfGlitchCard' + Date.now();
+          const t1 = 80 + Math.random()*5, t2 = t1+1, t3 = t2+1.5, t4 = t3+1, t5 = t4+3, t6 = t5+1;
           const styleEl = document.createElement('style');
           styleEl.textContent = `
-            @keyframes bfGlitchCard${Date.now()} {
-              0%,${t1}%,${t4}%,100% { filter: none; }
+            @keyframes ${id} {
+              0%,${t1}%,${t4}%,100% { transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)); filter: none; }
               ${t1+0.3}% { transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)) translate(-4px,1px) skewX(-0.5deg); filter: hue-rotate(15deg) saturate(1.3); }
               ${t2}% { transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)) translate(5px,-1px) skewX(1deg); filter: hue-rotate(-20deg) saturate(1.5); }
               ${t3}% { transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)) translate(-2px,2px); filter: hue-rotate(10deg); }
               ${t5}% { transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)) translate(3px,-1px) skewX(-0.3deg); filter: hue-rotate(-10deg); }
               ${t6}% { transform: rotateX(var(--rotateX)) rotateY(var(--rotateY)); filter: none; }
-            }`;
+            }
+            .bf-glitch-card { animation: ${id} 5s ease-in-out infinite; }
+          `;
           document.head.appendChild(styleEl);
           ctx.data.styleEl = styleEl;
-          ctx.data.animName = `bfGlitchCard${Date.now()}`;
-          card.style.animation = `${ctx.data.animName} 8s ease-in-out infinite`;
-        } else {
+          card.classList.add('bf-glitch-card');
+        }
+        else if (ctx.zone === 'top') {
+          // Frame distortion — random interval slice shifts
           const c = ctx.container;
-          const anim = ctx.zone === 'top' ? 'bfGlitchFrameShift' : 'bfGlitchImageTear';
-          for (let i = 0; i < 5; i++) {
-            const slice = document.createElement('div');
-            slice.className = 'bf-glitch-slice';
-            const h = 5 + Math.random() * 15;
-            const top = Math.random() * 100;
-            slice.style.cssText = `top:${top}%;height:${h}%;animation:${anim} ${3+Math.random()*4}s ${Math.random()*2}s ease-in-out infinite;`;
-            c.appendChild(slice);
-          }
+          c.style.background = 'var(--frame-color)';
+          c.style.opacity = '0';
+          ctx.interval = setInterval(() => {
+            const sliceTop = Math.random() * 80;
+            const sliceH = 3 + Math.random() * 15;
+            const shiftX = (Math.random() - 0.5) * 12;
+            c.style.clipPath = `inset(${sliceTop}% 0 ${100 - sliceTop - sliceH}% 0)`;
+            c.style.transform = `translateX(${shiftX}px)`;
+            c.style.opacity = '0.7';
+            setTimeout(() => {
+              c.style.opacity = '0';
+              c.style.transform = 'none';
+            }, 80 + Math.random() * 100);
+          }, 2000 + Math.random() * 3000);
+        }
+        else if (ctx.zone === 'bot') {
+          // VHS-style image tear — horizontal slices with color distortion
+          const c = ctx.container;
+          ctx.interval = setInterval(() => {
+            const numSlices = 2 + Math.floor(Math.random() * 3);
+            const slices = [];
+            for (let i = 0; i < numSlices; i++) {
+              const s = document.createElement('div');
+              s.className = 'bf-glitch-slice';
+              const top = Math.random() * 90;
+              const height = 2 + Math.random() * 10;
+              const shiftX = (Math.random() - 0.5) * 20;
+              const hue = (Math.random() - 0.5) * 40;
+              const col = Math.random() > 0.5 ? '255,0,0' : '0,100,255';
+              s.style.cssText = `top:${top}%;height:${height}%;transform:translateX(${shiftX}px);background:rgba(${col},0.08);filter:hue-rotate(${hue}deg);`;
+              c.appendChild(s);
+              slices.push(s);
+            }
+            // Chromatic split overlay
+            const chrom = document.createElement('div');
+            chrom.style.cssText = 'position:absolute;inset:0;border-radius:inherit;mix-blend-mode:screen;opacity:0.15;background:linear-gradient(90deg,rgba(255,0,0,0.3),transparent 33%,transparent 66%,rgba(0,100,255,0.3));';
+            c.appendChild(chrom);
+            slices.push(chrom);
+            setTimeout(() => slices.forEach(s => s.remove()), 100 + Math.random() * 150);
+          }, 2500 + Math.random() * 3000);
         }
       },
       cleanup(ctx) {
         if (ctx.zone === 'card') {
-          ctx.card.style.animation = '';
+          ctx.card.classList.remove('bf-glitch-card');
           ctx.data.styleEl?.remove();
         }
       }
