@@ -201,6 +201,17 @@ window.Bifrost = (() => {
       activeText.delete(cls);
       return false;
     } else {
+      // Find and inject CSS for this text effect if not already done
+      for (const [fxId, entry] of Object.entries(effects)) {
+        if (entry.def.textClass === cls && entry.def.css && !entry.def._cssInjected) {
+          const style = document.createElement('style');
+          style.textContent = entry.def.css;
+          style.dataset.bfEffect = fxId;
+          document.head.appendChild(style);
+          entry.def._cssInjected = true;
+          break;
+        }
+      }
       tz.classList.add(cls);
       activeText.add(cls);
       return true;
