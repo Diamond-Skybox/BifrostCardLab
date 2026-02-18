@@ -270,17 +270,17 @@ Bifrost.registerPack({
     // ─── TEXT ─────────────────────────────────────────────
     'text-wave': {
       name: 'Wave', category: 'text', type: 'text', textClass: 'text-wave', icon: '🌊',
-      css: `.text-wave .game-title { display:inline-block;animation:bfTextWave 2s ease-in-out infinite; }
+      css: `.text-wave .game-title, .text-wave .bf-badge-name { display:inline-block;animation:bfTextWave 2s ease-in-out infinite; }
         @keyframes bfTextWave { 0%,100%{transform:translateY(0)} 25%{transform:translateY(-3px) rotate(-0.5deg)} 75%{transform:translateY(3px) rotate(0.5deg)} }`,
     },
     'text-shadow-rise': {
       name: 'Shadow Rise', category: 'text', type: 'text', textClass: 'text-shadow-rise', icon: '🌅',
-      css: `.text-shadow-rise .game-title { animation:bfShadowRise 3s ease-in-out infinite; }
+      css: `.text-shadow-rise .game-title, .text-shadow-rise .bf-badge-name { animation:bfShadowRise 3s ease-in-out infinite; }
         @keyframes bfShadowRise { 0%,100%{text-shadow:0 2px 4px rgba(0,0,0,0.3)} 50%{text-shadow:0 6px 12px rgba(0,0,0,0.5),0 0 20px rgba(100,200,255,0.15)} }`,
     },
     'text-rainbow': {
       name: 'Rainbow', category: 'text', type: 'text', textClass: 'text-rainbow', icon: '🌈',
-      css: `.text-rainbow .game-title { background:linear-gradient(90deg,#e94560,#f59e0b,#00ff88,#54a0ff,#e94560);background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:bfTextRainbow 4s linear infinite; }
+      css: `.text-rainbow .game-title, .text-rainbow .bf-badge-name { background:linear-gradient(90deg,#e94560,#f59e0b,#00ff88,#54a0ff,#e94560);background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:bfTextRainbow 4s linear infinite; }
         @keyframes bfTextRainbow { 0%{background-position:0%} 100%{background-position:200%} }`,
     },
   },
