@@ -47,6 +47,7 @@ window.Bifrost = (() => {
     const entry = effects[effectId];
     if (!entry) { console.warn(`[Bifrost] Unknown effect: ${effectId}`); return; }
     const { pack, def } = entry;
+    console.log(`[Bifrost] Activating ${effectId}.${zone} (type: ${def.type || 'standard'}, hasInit: ${!!def.init}, hasCss: ${!!def.css})`);
 
     // Lazy CSS injection
     if (!def._cssInjected && def.css) {
@@ -329,6 +330,7 @@ window.Bifrost = (() => {
     const raw = str.trim();
     const s = raw.startsWith('fx:') ? raw.slice(3) : raw;
     const tokens = s.split(',').map(t => t.trim()).filter(Boolean);
+    console.log(`[Bifrost] Applying shorthand: ${tokens.length} tokens`, tokens);
 
     for (const token of tokens) {
       if (['tilt', 'parallax', 'gloss.top'].includes(token)) continue;
