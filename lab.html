@@ -35,6 +35,7 @@ body{background:#0a0a12;color:#eee;font-family:-apple-system,BlinkMacSystemFont,
 .bf-badge-sizer{width:calc(100% - var(--frame-padding)*2);aspect-ratio:3/4;margin:var(--frame-padding) auto 0;padding-bottom:var(--text-zone-h);visibility:hidden;pointer-events:none}
 .bf-layer-bottom{position:absolute;inset:0;z-index:1;transform:translateX(calc(var(--parallax-x)*-1)) translateY(calc(var(--parallax-y)*-1))}
 .bf-art-image{display:block;position:absolute;top:calc(var(--frame-padding) - var(--art-margin));left:calc(var(--frame-padding) - var(--art-margin));width:calc(100% - var(--frame-padding)*2 + var(--art-margin)*2);height:calc(var(--window-h) + var(--art-margin)*2);object-fit:cover;object-position:center top}
+.bf-art-placeholder{position:absolute;top:var(--frame-padding);left:var(--frame-padding);right:var(--frame-padding);height:var(--window-h);background:#0a0a1a;display:flex;align-items:center;justify-content:center;font-size:3rem;opacity:0.4}
 .bf-layer-mid{position:absolute;inset:0;overflow:hidden;z-index:2;pointer-events:none;transform:translateX(calc(var(--parallax-x)*-0.5)) translateY(calc(var(--parallax-y)*-0.5))}
 .bf-layer-top{position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;z-index:3;pointer-events:none}
 .bf-frame-surface{position:absolute;inset:0;border-radius:var(--card-radius);overflow:hidden;background:var(--frame-color);
@@ -104,6 +105,7 @@ body{background:#0a0a12;color:#eee;font-family:-apple-system,BlinkMacSystemFont,
       <div class="bf-badge" id="previewCard">
         <div class="bf-badge-sizer"></div>
         <div class="bf-layer-bottom" id="layerBottom">
+          <div class="bf-art-placeholder" id="artPlaceholder">🧑</div>
           <img class="bf-art-image" id="artImage" src="" alt="" onerror="this.style.display='none'"/>
         </div>
         <div class="bf-layer-mid" id="layerMid"></div>
@@ -179,6 +181,7 @@ const LAB_CONFIG = {
 
   function computeWindowH() {
     const padding = 10;
+    const textZoneH = 52;
     const winW = card.offsetWidth - padding * 2;
     if (winW <= 0) {
       console.log('[Lab] computeWindowH: card not laid out yet, width=' + card.offsetWidth);
@@ -186,7 +189,10 @@ const LAB_CONFIG = {
     }
     const winH = winW * (4/3);
     card.style.setProperty('--window-h', winH + 'px');
-    console.log('[Lab] computeWindowH: winW=' + winW + ', winH=' + winH);
+    // Explicitly set card height to ensure text zone has room
+    const totalH = padding + winH + textZoneH + padding;
+    card.style.height = totalH + 'px';
+    console.log('[Lab] computeWindowH: winW=' + winW + ', winH=' + winH + ', totalH=' + totalH);
   }
   // Multiple timing strategies to ensure it fires after layout
   computeWindowH();
