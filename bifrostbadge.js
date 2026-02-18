@@ -1,505 +1,709 @@
 /**
- * BifrostBadge — Bifrost Card Effects for employee badges
- * Loaded by bifrostbadge-loader.user.js
+ * BIFROST CORE ENGINE
+ * Effect renderer, plugin registry, dynamic UI builder
+ * No effects included — all effects come from theme packs
  */
-(function () {
-  'use strict';
 
-  // ================================================================
-  // CONFIG — Replace these URLs with your corp drive paths
-  // ================================================================
-  const CONFIG = {
-    VERSION: '0.1.0',
-    BROADCAST_CHANNEL: 'bifrost-badge-lab',
-    DEBUG: true,
-  };
+window.Bifrost = (() => {
+  // ============================================================
+  // STATE
+  // ============================================================
+  const packs = {};
+  const effects = {};       // flat lookup: { effectId: { pack, def } }
+  const active = {};         // { 'effectId-zone': { ctx, packId, effectId, zone } }
+  const activeText = new Set();
+  let asciiState = null;
+  let card, layers, tiltState, uiPanel;
+  let parallaxEnabled = true, parallaxStrength = 8;
 
-  // ================================================================
-  // LOGGING
-  // ================================================================
-  const log = (...args) => {
-    if (CONFIG.DEBUG) console.log('[BifrostBadge]', ...args);
-  };
-  const warn = (...args) => console.warn('[BifrostBadge]', ...args);
-
-  // ================================================================
-  // LOCAL STORAGE (replaces GM_getValue/GM_setValue)
-  // Since we're loaded as a page script, we use localStorage
-  // ================================================================
-  const store = {
-    get(key, fallback = null) {
-      try {
-        const val = localStorage.getItem('bifrost_' + key);
-        return val !== null ? JSON.parse(val) : fallback;
-      } catch { return fallback; }
-    },
-    set(key, value) {
-      try { localStorage.setItem('bifrost_' + key, JSON.stringify(value)); }
-      catch (e) { warn('localStorage write failed:', e); }
-    },
-    remove(key) {
-      try { localStorage.removeItem('bifrost_' + key); }
-      catch (e) { warn('localStorage remove failed:', e); }
-    }
-  };
-
-  // ================================================================
-  // ALIAS EXTRACTION
-  // ================================================================
-
-  function extractAlias() {
-    // 1. Native badge login div
-    const loginDiv = document.querySelector('.worker-badge .login, div.login');
-    if (loginDiv) {
-      const alias = loginDiv.textContent.trim();
-      if (alias) return alias;
-    }
-
-    // 2. HyperBadge's Username div
-    const hbUsername = document.querySelector('.HyperBadge .Username');
-    if (hbUsername) {
-      const alias = hbUsername.textContent.trim().replace('@', '');
-      if (alias) return alias;
-    }
-
-    // 3. URL fallback — /users/{alias}
-    const urlMatch = window.location.pathname.match(/\/users\/([^/?#]+)/);
-    if (urlMatch) return urlMatch[1];
-
-    return null;
-  }
-
-  // ================================================================
-  // BADGE PHOTO URL
-  // ================================================================
-
-  function getBadgePhotoUrl(alias) {
-    return `https://badgephotos.corp.amazon.com/?uid=${alias}`;
-  }
-
-  function getFullBadgePhotoUrl(alias) {
-    return `https://badgephotos.corp.amazon.com/?fullsizeimage=1&give404ifmissing=1&uid=${alias}`;
-  }
-
-  // ================================================================
-  // NAME EXTRACTION
-  // ================================================================
-
-  function extractName() {
-    // HyperBadge elements
-    const hbFirst = document.querySelector('.HyperBadge .FirstName');
-    const hbLast = document.querySelector('.HyperBadge .LastName');
-    if (hbFirst && hbLast) {
-      return { first: hbFirst.textContent.trim(), last: hbLast.textContent.trim() };
-    }
-
-    // Native badge
-    const nameDiv = document.querySelector('.worker-badge .name, div.name');
-    if (nameDiv) {
-      const strong = nameDiv.querySelector('strong');
-      const paragraphs = nameDiv.querySelectorAll('p');
-      if (strong && paragraphs.length >= 2) {
-        return { first: strong.textContent.trim(), last: paragraphs[1].textContent.trim() };
-      }
-    }
-
-    return { first: '', last: '' };
-  }
-
-  // ================================================================
-  // DETECTION
-  // ================================================================
-
-  function detectBadgeState() {
-    const hyperBadge = document.querySelector('div.HyperBadge');
-    const nativeBadge = document.querySelector('div.employee-badge');
-
-    return {
-      hasHyperBadge: !!hyperBadge,
-      hasNativeBadge: !!nativeBadge,
-      hyperBadgeEl: hyperBadge,
-      nativeBadgeEl: nativeBadge,
-      hyperBadgeMenu: hyperBadge ? hyperBadge.querySelector('div.Menu ul') : null,
-      hyperBadgeContainer: hyperBadge ? hyperBadge.querySelector('div.Container') : null,
-    };
-  }
-
-  // ================================================================
-  // BUTTON INJECTION
-  // ================================================================
-
-  function createBifrostMenuButton(onClick) {
-    const li = document.createElement('li');
-    const a = document.createElement('a');
-    a.className = 'Button';
-    a.href = '#';
-    a.innerHTML = `<span class="Icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 0L9.5 5.5L16 8L9.5 10.5L8 16L6.5 10.5L0 8L6.5 5.5L8 0Z" fill="currentColor"/></svg></span>BifrostBadge`;
-    a.addEventListener('click', (e) => {
-      e.preventDefault();
-      onClick();
-    });
-    li.appendChild(a);
-    return li;
-  }
-
-  function createStandaloneButton(onClick) {
-    const btn = document.createElement('div');
-    btn.id = 'bifrost-badge-activate';
-    btn.className = 'bifrost-activate-btn';
-    btn.textContent = '✦ BifrostBadge Effects';
-    btn.addEventListener('click', onClick);
-    return btn;
-  }
-
-  function injectButton(badgeState, onClick) {
-    const existing = document.getElementById('bifrost-badge-activate');
-    if (existing) existing.remove();
-
-    // Also remove any previously injected HyperBadge menu item
-    const existingMenuItem = document.querySelector('.bifrost-menu-item');
-    if (existingMenuItem) existingMenuItem.remove();
-
-    if (badgeState.hasHyperBadge && badgeState.hyperBadgeMenu) {
-      log('Injecting into HyperBadge menu');
-      const menuBtn = createBifrostMenuButton(onClick);
-      menuBtn.classList.add('bifrost-menu-item');
-      badgeState.hyperBadgeMenu.appendChild(menuBtn);
-    } else if (badgeState.hasNativeBadge) {
-      log('Injecting standalone button');
-      const btn = createStandaloneButton(onClick);
-      badgeState.nativeBadgeEl.parentNode.insertBefore(
-        btn,
-        badgeState.nativeBadgeEl.nextSibling
-      );
-    } else {
-      warn('No badge element found');
-    }
-  }
-
-  // ================================================================
-  // EFFECTS LAB (Blob URL)
-  // ================================================================
-
-  function openEffectsLab(alias, photoUrl, name, currentShorthand) {
-    const bifrostData = window.__bifrostData || {};
-    const root = bifrostData.root || '';
-    const labUrl = root + '/lab.html'
-      + '?alias=' + encodeURIComponent(alias)
-      + '&photo=' + encodeURIComponent(photoUrl)
-      + '&name=' + encodeURIComponent(name.first + ' ' + name.last)
-      + '&fx=' + encodeURIComponent(currentShorthand || '');
-    window.open(labUrl, '_blank');
-  }
-
-  // ================================================================
-  // BROADCAST CHANNEL LISTENER
-  // ================================================================
-
-  function setupBroadcastListener(alias) {
-    // BroadcastChannel — works for same-origin tabs
-    const channel = new BroadcastChannel(CONFIG.BROADCAST_CHANNEL);
-    channel.addEventListener('message', (event) => {
-      handleLabMessage(event.data, alias);
-    });
-
-    // postMessage — works cross-origin (lab on drive-render -> phonetool)
-    window.addEventListener('message', (event) => {
-      if (event.data && event.data.type && event.data.type.startsWith('bifrost-')) {
-        handleLabMessage(event.data, alias);
-      }
-    });
-  }
-
-  function handleLabMessage(data, alias) {
-    const { type, alias: msgAlias, shorthand } = data;
-    if (msgAlias !== alias) return;
-
-    switch (type) {
-      case 'bifrost-save-local':
-        log('Saving local frame:', shorthand);
-        store.set('frame_' + alias, shorthand);
-        applyBifrostFrame(alias, shorthand);
-        break;
-      case 'bifrost-clear-local':
-        log('Clearing local frame');
-        store.remove('frame_' + alias);
-        removeBifrostFrame();
-        break;
-    }
-  }
-
-  // ================================================================
-  // BIFROST CARD RENDERING
-  // ================================================================
-
-  // Card state
-  let bifrostCardEl = null;
-  let hiddenElements = [];
-
-  /**
-   * Build and inject the Bifrost badge card.
-   */
-  function applyBifrostFrame(alias, shorthand) {
-    log('Applying frame:', shorthand, 'for', alias);
-
-    // Remove existing Bifrost card if re-applying
-    if (bifrostCardEl) removeBifrostFrame();
-
-    const badgeState = detectBadgeState();
-    const name = extractName();
-    const photoUrl = getFullBadgePhotoUrl(alias);
-
-    // Hide existing badge rendering
-    if (badgeState.hasHyperBadge && badgeState.hyperBadgeContainer) {
-      badgeState.hyperBadgeContainer.style.display = 'none';
-      hiddenElements.push(badgeState.hyperBadgeContainer);
-    } else if (badgeState.hasNativeBadge) {
-      const workerBadge = badgeState.nativeBadgeEl.querySelector('.worker-badge');
-      if (workerBadge) {
-        workerBadge.style.display = 'none';
-        hiddenElements.push(workerBadge);
-      }
-    }
-
-    // Build card DOM
-    const card = buildBifrostCard(photoUrl, name, alias);
-
-    // Insert into page
-    if (badgeState.hasHyperBadge && badgeState.hyperBadgeContainer) {
-      badgeState.hyperBadgeContainer.parentNode.insertBefore(
-        card, badgeState.hyperBadgeContainer
-      );
-    } else if (badgeState.hasNativeBadge) {
-      const workerBadge = badgeState.nativeBadgeEl.querySelector('.worker-badge');
-      if (workerBadge) {
-        workerBadge.parentNode.insertBefore(card, workerBadge);
+  // ============================================================
+  // REGISTRATION
+  // ============================================================
+  function registerPack(packDef) {
+    packs[packDef.id] = packDef;
+    for (const [fxId, fxDef] of Object.entries(packDef.effects || {})) {
+      // If no pack already owns this name, allow short form
+      const globalId = fxId;
+      if (effects[globalId] && effects[globalId].pack.id !== packDef.id) {
+        // Conflict — store under full path only
+        effects[`${packDef.id}.${fxId}`] = { pack: packDef, def: fxDef };
       } else {
-        badgeState.nativeBadgeEl.prepend(card);
+        effects[globalId] = { pack: packDef, def: fxDef };
       }
+      // Always store full path
+      effects[`${packDef.id}.${fxId}`] = { pack: packDef, def: fxDef };
     }
-
-    bifrostCardEl = card;
-
-    // Set up tilt/parallax
-    const tiltState = setupTilt(card);
-
-    // Compute window height after card is in DOM
-    computeWindowH(card);
-
-    // Initialize Bifrost engine with the card's layers
-    if (window.Bifrost) {
-      const badgeEl = card.querySelector('.bf-badge');
-      const layerEls = {
-        top: card.querySelector('.bf-layer-top'),
-        mid: card.querySelector('.bf-layer-mid'),
-        bot: card.querySelector('.bf-layer-bottom'),
-        text: card.querySelector('.bf-text-zone'),
-      };
-      Bifrost.init(badgeEl, layerEls, tiltState, null);
-
-      if (shorthand) {
-        Bifrost.applyShorthand(shorthand);
-      }
-      log('Bifrost engine initialized with', Object.keys(Bifrost.packs).length, 'packs');
-    } else {
-      log('Bifrost engine not loaded — card rendered without effects');
-    }
-
-    log('Card injected');
+    console.log(`[Bifrost] Registered pack: ${packDef.icon || '📦'} ${packDef.name} (${Object.keys(packDef.effects || {}).length} effects)`);
+    if (uiPanel) rebuildUI();
   }
 
-  /**
-   * Build the Bifrost card DOM structure.
-   * Badge photos are 3:4 ratio.
-   */
-  function buildBifrostCard(photoUrl, name, alias) {
-    const boundary = document.createElement('div');
-    boundary.className = 'bifrost-boundary';
-    boundary.id = 'bifrost-badge-card';
+  // ============================================================
+  // EFFECT LIFECYCLE
+  // ============================================================
+  function activate(effectId, zone) {
+    const key = `${effectId}-${zone}`;
+    if (active[key]) return;
 
-    boundary.innerHTML = `
-      <div class="bf-badge">
-        <div class="bf-badge-sizer"></div>
-        <div class="bf-layer-bottom">
-          <img class="bf-art-image" src="${photoUrl}" alt="${name.first} ${name.last}" />
-        </div>
-        <div class="bf-layer-mid"></div>
-        <div class="bf-layer-top">
-          <div class="bf-frame-surface"></div>
-          <div class="bf-art-window-border"></div>
-        </div>
-        <div class="bf-gloss-overlay"></div>
-        <div class="bf-text-zone">
-          <div class="bf-badge-name">${name.first} ${name.last}</div>
-          <div class="bf-badge-alias">@${alias}</div>
-        </div>
-      </div>
-    `;
+    const entry = effects[effectId];
+    if (!entry) { console.warn(`[Bifrost] Unknown effect: ${effectId}`); return; }
+    const { pack, def } = entry;
+    console.log(`[Bifrost] Activating ${effectId}.${zone} (type: ${def.type || 'standard'}, hasInit: ${!!def.init}, hasCss: ${!!def.css})`);
 
-    return boundary;
-  }
+    // Lazy CSS injection
+    if (!def._cssInjected && def.css) {
+      const style = document.createElement('style');
+      style.textContent = def.css;
+      style.dataset.bfPack = pack.id;
+      style.dataset.bfEffect = effectId;
+      document.head.appendChild(style);
+      def._cssInjected = true;
+    }
 
-  /**
-   * Compute --window-h from card width for the clip-path.
-   */
-  function computeWindowH(boundary) {
-    const card = boundary.querySelector('.bf-badge');
-    if (!card) return;
+    // --- TEXT EFFECTS ---
+    if (def.type === 'text' && def.textClass) {
+      const tz = (layers && layers.text) || document.getElementById('textZone');
+      if (tz) {
+        tz.classList.add(def.textClass);
+        const ctx = { container: null, card, zone: 'text', layer: tz, tiltState, interval: null, data: { _textClass: def.textClass } };
+        if (def.init) def.init(ctx);
+        active[key] = { ctx, packId: pack.id, effectId, zone: 'text' };
+      }
+      return;
+    }
 
-    const update = () => {
-      const padding = 10; // --frame-padding
-      const winW = card.offsetWidth - padding * 2;
-      const winH = winW * (4 / 3); // 3:4 ratio
-      card.style.setProperty('--window-h', `${winH}px`);
+    // --- BORDER EFFECTS ---
+    if (def.type === 'border' || zone === 'border') {
+      const ctx = { container: null, card, zone: 'border', layer: card, tiltState, interval: null, data: {} };
+      if (def.className) {
+        card.classList.add(def.className);
+        ctx.data._className = def.className;
+      }
+      if (def.init) def.init(ctx);
+      active[key] = { ctx, packId: pack.id, effectId, zone: 'border' };
+      if (pack.onEffectChange) pack.onEffectChange(getPackActive(pack.id), active);
+      return;
+    }
+
+    // --- STANDARD EFFECTS ---
+    const layer = getLayer(zone);
+    const container = document.createElement('div');
+    container.className = `bf-fx-container bf-${effectId.replace(/\./g, '-')}-${zone}`;
+    container.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:inherit;';
+    const zi = { top: '6', mid: '3', bot: '1' }[zone] || '3';
+    container.style.zIndex = zi;
+    layer.appendChild(container);
+
+    // Build context
+    const ctx = {
+      container,
+      card,
+      zone,
+      layer,
+      tiltState,
+      interval: null,
+      data: {},
+      el(tag, className) {
+        const e = document.createElement(tag);
+        if (className) e.className = className;
+        container.appendChild(e);
+        return e;
+      }
     };
 
-    update();
+    if (def.init) {
+      def.init(ctx);
+    } else if (def.className) {
+      card.classList.add(def.className);
+      ctx.data._className = def.className;
+    }
+    active[key] = { ctx, packId: pack.id, effectId, zone };
 
-    const observer = new ResizeObserver(update);
-    observer.observe(card);
-    // Store observer for cleanup
-    card._resizeObserver = observer;
+    if (pack.onEffectChange) {
+      pack.onEffectChange(getPackActive(pack.id), active);
+    }
   }
 
-  /**
-   * Set up tilt and parallax on mousemove.
-   */
-  function setupTilt(boundary) {
-    const card = boundary.querySelector('.bf-badge');
-    if (!card) return { x: 0, y: 0 };
+  function deactivate(effectId, zone) {
+    const key = `${effectId}-${zone}`;
+    const entry = active[key];
+    if (!entry) return;
 
-    const tiltState = { x: 0, y: 0 };
+    const { ctx, packId } = entry;
+    const e = effects[effectId];
 
-    boundary.addEventListener('mousemove', (e) => {
-      const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-
-      const normX = (x - centerX) / centerX;
-      const normY = (y - centerY) / centerY;
-
-      tiltState.x = normX;
-      tiltState.y = normY;
-
-      card.style.setProperty('--rotateX', `${normY * -12}deg`);
-      card.style.setProperty('--rotateY', `${normX * 12}deg`);
-      card.style.setProperty('--glossX', `${(x / rect.width) * 100}%`);
-      card.style.setProperty('--glossY', `${(y / rect.height) * 100}%`);
-      card.style.setProperty('--parallax-x', `${normX * 8.5}px`);
-      card.style.setProperty('--parallax-y', `${normY * 8.5}px`);
-    });
-
-    boundary.addEventListener('mouseleave', () => {
-      tiltState.x = 0;
-      tiltState.y = 0;
-
-      card.style.setProperty('--rotateX', '0deg');
-      card.style.setProperty('--rotateY', '0deg');
-      card.style.setProperty('--glossX', '50%');
-      card.style.setProperty('--glossY', '50%');
-      card.style.setProperty('--parallax-x', '0px');
-      card.style.setProperty('--parallax-y', '0px');
-    });
-
-    return tiltState;
-  }
-
-  /**
-   * Remove Bifrost card and restore original badge.
-   */
-  function removeBifrostFrame() {
-    log('Removing frame');
-
-    // Deactivate all effects
-    if (window.Bifrost) {
-      Bifrost.deactivateAll();
+    // Text effect cleanup
+    if (ctx.data && ctx.data._textClass) {
+      const tz = (layers && layers.text) || document.getElementById('textZone');
+      if (tz) tz.classList.remove(ctx.data._textClass);
     }
 
-    if (bifrostCardEl) {
-      const card = bifrostCardEl.querySelector('.bf-badge');
-      if (card && card._resizeObserver) {
-        card._resizeObserver.disconnect();
+    // Border className cleanup
+    if (ctx.data && ctx.data._className) {
+      card.classList.remove(ctx.data._className);
+    }
+
+    // Standard cleanup
+    if (e && e.def.cleanup) e.def.cleanup(ctx);
+
+    if (ctx.interval) clearInterval(ctx.interval);
+    if (ctx.animFrame) cancelAnimationFrame(ctx.animFrame);
+    if (ctx.container) ctx.container.remove();
+    delete active[key];
+
+    if (ctx._appliedClass) {
+      const target = zone === 'border' || zone === 'card' ? card : getLayer(zone);
+      target.classList.remove(ctx._appliedClass);
+    }
+
+    const pack = packs[packId];
+    if (pack && pack.onEffectChange) {
+      pack.onEffectChange(getPackActive(packId), active);
+    }
+  }
+
+  function toggle(effectId, zone) {
+    const key = `${effectId}-${zone}`;
+    if (active[key]) {
+      deactivate(effectId, zone);
+      return false;
+    } else {
+      activate(effectId, zone);
+      return true;
+    }
+  }
+
+  function deactivateAll() {
+    for (const key of Object.keys(active)) {
+      const { effectId, zone } = active[key];
+      deactivate(effectId, zone);
+    }
+    // Clear text effects
+    const tz = (layers && layers.text) || document.getElementById('textZone');
+    if (tz) {
+      for (const cls of activeText) tz.classList.remove(cls);
+      activeText.clear();
+    }
+    // Clear ascii
+    if (asciiState) {
+      clearInterval(asciiState.iv);
+      asciiState.el.remove();
+      asciiState = null;
+    }
+  }
+
+  // ============================================================
+  // TEXT EFFECTS
+  // ============================================================
+  function toggleText(cls) {
+    const tz = (layers && layers.text) || document.getElementById('textZone');
+    console.log(`[Bifrost] toggleText('${cls}'), textZone:`, tz, 'layers.text:', layers?.text);
+    if (!tz) return;
+    if (activeText.has(cls)) {
+      tz.classList.remove(cls);
+      activeText.delete(cls);
+      return false;
+    } else {
+      // Find and inject CSS for this text effect if not already done
+      for (const [fxId, entry] of Object.entries(effects)) {
+        if (entry.def.textClass === cls && entry.def.css && !entry.def._cssInjected) {
+          const style = document.createElement('style');
+          style.textContent = entry.def.css;
+          style.dataset.bfEffect = fxId;
+          document.head.appendChild(style);
+          entry.def._cssInjected = true;
+          break;
+        }
       }
-      bifrostCardEl.remove();
-      bifrostCardEl = null;
+      tz.classList.add(cls);
+      activeText.add(cls);
+      return true;
     }
-
-    // Restore hidden elements
-    hiddenElements.forEach(el => {
-      el.style.display = '';
-    });
-    hiddenElements = [];
   }
 
-  // ================================================================
-  // MAIN
-  // ================================================================
-
-  async function init() {
-    log('Initializing v' + CONFIG.VERSION);
-
-    // 1. Extract alias
-    const alias = extractAlias();
-    if (!alias) { warn('No alias found — aborting'); return; }
-    log('Alias:', alias);
-
-    // 2. Extract name + photo
-    const name = extractName();
-    const photoUrl = getFullBadgePhotoUrl(alias);
-    log('Name:', name.first, name.last);
-
-    // 3. Check blocklist (pre-loaded by loader via GM_xmlhttpRequest)
-    const bifrostData = window.__bifrostData || {};
-    const blocklist = bifrostData.blocklist;
-    if (Array.isArray(blocklist) && blocklist.includes(alias)) {
-      log('Alias blocklisted — skipping');
-      return;
+  // ============================================================
+  // ASCII ANIMATIONS
+  // ============================================================
+  function playAscii(animName, zone, x, y, color) {
+    // Find the animation across all packs
+    let anim = null;
+    for (const pack of Object.values(packs)) {
+      if (pack.ascii && pack.ascii[animName]) {
+        anim = pack.ascii[animName];
+        break;
+      }
     }
+    if (!anim) { console.warn(`[Bifrost] ASCII animation not found: ${animName}`); return; }
 
-    // 4. Check database frames (pre-loaded by loader)
-    const userFrames = bifrostData.userFrames;
-    const dbFrame = userFrames ? userFrames[alias] : null;
-    if (dbFrame) {
-      log('Database frame found:', dbFrame);
-      applyBifrostFrame(alias, dbFrame);
-      // Locked — no edit button
-      return;
-    }
+    stopAscii();
 
-    // 5. Check local save
-    const localFrame = store.get('frame_' + alias);
-    if (localFrame) {
-      log('Local frame found:', localFrame);
-      applyBifrostFrame(alias, localFrame);
-    }
+    const layer = getLayer(zone);
+    const container = document.createElement('div');
+    container.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:inherit;';
+    container.style.zIndex = { top: '6', mid: '3', bot: '1' }[zone] || '3';
+    layer.appendChild(container);
 
-    // 6. Detect badge & inject button
-    const badgeState = detectBadgeState();
-    log('State:', { hb: badgeState.hasHyperBadge, native: badgeState.hasNativeBadge });
+    const pre = document.createElement('pre');
+    pre.style.cssText = `position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-50%);color:${color};font-size:10px;opacity:0.8;text-shadow:0 0 4px ${color};font-family:'JetBrains Mono','Courier New',monospace;white-space:pre;line-height:1.1;pointer-events:none;text-align:center;`;
+    container.appendChild(pre);
 
-    injectButton(badgeState, () => {
-      const current = store.get('frame_' + alias, '');
-      openEffectsLab(alias, photoUrl, name, current);
-    });
+    const maxW = Math.max(...anim.frames.map(f => f.length));
+    const padded = anim.frames.map(f => f.padEnd(maxW));
+    let idx = 0;
+    pre.textContent = padded[0];
 
-    // 7. Listen for lab messages
-    setupBroadcastListener(alias);
+    const iv = setInterval(() => {
+      idx = (idx + 1) % padded.length;
+      pre.textContent = padded[idx];
+    }, anim.speed);
 
-    log('Ready');
+    asciiState = { iv, el: container, pre, name: animName, zone, x, y, color };
   }
 
-  // ================================================================
-  // STARTUP — delay to let HyperBadge inject first
-  // ================================================================
-
-  function start() { setTimeout(init, 1500); }
-
-  if (document.readyState === 'complete') {
-    start();
-  } else {
-    window.addEventListener('load', start);
+  function stopAscii() {
+    if (asciiState) {
+      clearInterval(asciiState.iv);
+      asciiState.el.remove();
+      asciiState = null;
+    }
   }
 
+  function updateAsciiPos(x, y) {
+    if (asciiState && asciiState.pre) {
+      asciiState.pre.style.left = `${x}%`;
+      asciiState.pre.style.top = `${y}%`;
+      asciiState.x = x;
+      asciiState.y = y;
+    }
+  }
+
+  // ============================================================
+  // BORDER EFFECTS (class-based)
+  // ============================================================
+  function activateBorder(effectId, zone) {
+    const key = `${effectId}-${zone}`;
+    if (active[key]) return;
+
+    const entry = effects[effectId];
+    if (!entry) return;
+    const { pack, def } = entry;
+
+    // Inject CSS if needed
+    if (!def._cssInjected && def.css) {
+      const style = document.createElement('style');
+      style.textContent = def.css;
+      document.head.appendChild(style);
+      def._cssInjected = true;
+    }
+
+    const ctx = { container: null, card, zone, layer: card, tiltState, interval: null, data: {} };
+
+    if (def.className) {
+      card.classList.add(def.className);
+      ctx._appliedClass = def.className;
+    }
+
+    if (def.init) def.init(ctx);
+
+    active[key] = { ctx, packId: pack.id, effectId, zone };
+  }
+
+  // ============================================================
+  // SHORTHAND
+  // ============================================================
+  function buildShorthand() {
+    const parts = ['tilt', 'parallax', 'gloss.top'];
+    for (const key of Object.keys(active)) {
+      const { effectId, zone } = active[key];
+      parts.push(`${effectId}.${zone}`);
+    }
+    for (const cls of activeText) {
+      parts.push(`${cls.replace('text-', '')}.text`);
+    }
+    if (asciiState) {
+      const ac = asciiState.color.replace('#', '');
+      parts.push(`ascii:${asciiState.name}.${asciiState.zone}@${asciiState.x}/${asciiState.y}/${ac}`);
+    }
+    return `fx:${parts.join(',')}`;
+  }
+
+  function applyShorthand(str) {
+    deactivateAll();
+    const raw = str.trim();
+    const s = raw.startsWith('fx:') ? raw.slice(3) : raw;
+    const tokens = s.split(',').map(t => t.trim()).filter(Boolean);
+    console.log(`[Bifrost] Applying shorthand: ${tokens.length} tokens`, tokens);
+
+    for (const token of tokens) {
+      if (['tilt', 'parallax', 'gloss.top'].includes(token)) continue;
+
+      // ASCII
+      if (token.startsWith('ascii:')) {
+        const asciiStr = token.slice(6);
+        const atIdx = asciiStr.indexOf('@');
+        let nameZone, x = 50, y = 50, color = '#00ff88';
+        if (atIdx !== -1) {
+          nameZone = asciiStr.slice(0, atIdx);
+          const params = asciiStr.slice(atIdx + 1).split('/');
+          if (params[0]) x = parseInt(params[0]);
+          if (params[1]) y = parseInt(params[1]);
+          if (params[2]) color = '#' + params[2];
+        } else {
+          nameZone = asciiStr;
+        }
+        const dotIdx = nameZone.lastIndexOf('.');
+        const animName = nameZone.slice(0, dotIdx);
+        const zone = nameZone.slice(dotIdx + 1);
+        playAscii(animName, zone, x, y, color);
+        continue;
+      }
+
+      // Text effects
+      const dotIdx = token.lastIndexOf('.');
+      if (dotIdx === -1) continue;
+      const fxName = token.slice(0, dotIdx);
+      const zone = token.slice(dotIdx + 1);
+
+      if (zone === 'text') {
+        const cls = fxName.startsWith('text-') ? fxName : `text-${fxName}`;
+        toggleText(cls);
+        continue;
+      }
+
+      // Regular effects
+      if (effects[fxName]) {
+        const def = effects[fxName].def;
+        if (def.type === 'border' || zone === 'border') {
+          activateBorder(fxName, zone);
+        } else {
+          activate(fxName, zone);
+        }
+      }
+    }
+  }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  function getLayer(zone) {
+    if (layers) {
+      return {
+        top: layers.top,
+        mid: layers.mid,
+        bot: layers.bot,
+        border: card,
+        card: card
+      }[zone] || card;
+    }
+    // Fallback to getElementById for standalone lab usage
+    return {
+      top: document.getElementById('layerTop'),
+      mid: document.getElementById('layerMid'),
+      bot: document.getElementById('layerBottom'),
+      border: card,
+      card: card
+    }[zone] || card;
+  }
+
+  function getPackActive(packId) {
+    const result = new Map();
+    for (const [key, entry] of Object.entries(active)) {
+      if (entry.packId === packId) {
+        result.set(entry.effectId, entry);
+      }
+    }
+    return result;
+  }
+
+  function getAllAsciiAnims() {
+    const all = {};
+    for (const pack of Object.values(packs)) {
+      if (pack.ascii) {
+        for (const [name, anim] of Object.entries(pack.ascii)) {
+          all[name] = { ...anim, pack: pack.id, packName: pack.name };
+        }
+      }
+    }
+    return all;
+  }
+
+  // ============================================================
+  // UI BUILDER
+  // ============================================================
+  function rebuildUI() {
+    if (!uiPanel) return;
+
+    // Clear existing effect sections (keep base controls)
+    uiPanel.querySelectorAll('.bf-pack-section').forEach(el => el.remove());
+
+    // Group effects by pack
+    for (const [packId, pack] of Object.entries(packs)) {
+      const section = document.createElement('div');
+      section.className = 'control-section bf-pack-section';
+      section.innerHTML = `<h3>${pack.icon || '📦'} ${pack.name}</h3>`;
+
+      // Group by category
+      const byCategory = {};
+      for (const [fxId, fxDef] of Object.entries(pack.effects || {})) {
+        const cat = fxDef.category || 'other';
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push({ id: fxId, ...fxDef });
+      }
+
+      // Category order
+      const catOrder = ['particle', 'overlay', 'distortion', 'light', 'environment', 'border', 'frame', 'text'];
+      const sortedCats = Object.keys(byCategory).sort((a, b) => {
+        const ai = catOrder.indexOf(a), bi = catOrder.indexOf(b);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      });
+
+      for (const cat of sortedCats) {
+        const fxList = byCategory[cat];
+        const catLabel = document.createElement('div');
+        catLabel.style.cssText = 'color:#666;font-size:0.65rem;text-transform:uppercase;letter-spacing:1px;margin:0.5rem 0 0.25rem;';
+        catLabel.textContent = cat;
+        section.appendChild(catLabel);
+
+        const row = document.createElement('div');
+        row.className = 'toggle-row';
+        row.style.flexWrap = 'wrap';
+
+        for (const fx of fxList) {
+          if (fx.type === 'text') {
+            // Text effect — single button
+            const btn = document.createElement('button');
+            btn.className = 'toggle-btn';
+            btn.textContent = `${fx.icon || '✦'} ${fx.name}`;
+            btn.onclick = () => {
+              const isActive = toggleText(fx.textClass);
+              btn.classList.toggle('active', isActive);
+              updateShorthandUI();
+            };
+            row.appendChild(btn);
+          } else if (fx.type === 'border') {
+            // Border effect — single button
+            const btn = document.createElement('button');
+            btn.className = 'toggle-btn';
+            btn.textContent = `${fx.icon || '✦'} ${fx.name}`;
+            btn.onclick = () => {
+              const key = `${fx.id}-border`;
+              if (active[key]) {
+                deactivate(fx.id, 'border');
+                btn.classList.remove('active');
+              } else {
+                activateBorder(fx.id, 'border');
+                btn.classList.add('active');
+              }
+              updateShorthandUI();
+            };
+            row.appendChild(btn);
+          } else {
+            // Standard effect — one button per zone
+            for (const zone of (fx.zones || ['mid'])) {
+              const btn = document.createElement('button');
+              btn.className = 'toggle-btn';
+              btn.textContent = `${fx.icon || '✦'} ${fx.name}.${zone}`;
+              btn.onclick = () => {
+                const isActive = toggle(fx.id, zone);
+                btn.classList.toggle('active', isActive);
+                updateShorthandUI();
+              };
+              row.appendChild(btn);
+            }
+          }
+        }
+        section.appendChild(row);
+      }
+
+      // Presets
+      if (pack.presets) {
+        const presetLabel = document.createElement('div');
+        presetLabel.style.cssText = 'color:#666;font-size:0.65rem;text-transform:uppercase;letter-spacing:1px;margin:0.5rem 0 0.25rem;';
+        presetLabel.textContent = 'presets';
+        section.appendChild(presetLabel);
+        const presetRow = document.createElement('div');
+        presetRow.className = 'toggle-row';
+        presetRow.style.flexWrap = 'wrap';
+        for (const [name, fxList] of Object.entries(pack.presets)) {
+          const btn = document.createElement('button');
+          btn.className = 'toggle-btn';
+          btn.style.cssText = 'border-color:#f59e0b;color:#f59e0b;';
+          btn.textContent = `⚡ ${name}`;
+          btn.onclick = () => {
+            deactivateAll();
+            for (const fxStr of fxList) {
+              const dotIdx = fxStr.lastIndexOf('.');
+              const fxId = fxStr.slice(0, dotIdx);
+              const zone = fxStr.slice(dotIdx + 1);
+              if (zone === 'text') toggleText(`text-${fxId}`);
+              else if (zone === 'border') activateBorder(fxId, 'border');
+              else activate(fxId, zone);
+            }
+            // Update all button states
+            uiPanel.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+            for (const key of Object.keys(active)) {
+              const { effectId, zone } = active[key];
+              // Find matching button
+              uiPanel.querySelectorAll('.toggle-btn').forEach(b => {
+                if (b.textContent.includes(`${effectId}.${zone}`) || b.textContent.includes(effects[effectId]?.def?.name + '.' + zone)) {
+                  b.classList.add('active');
+                }
+              });
+            }
+            updateShorthandUI();
+          };
+          presetRow.appendChild(btn);
+        }
+        section.appendChild(presetRow);
+      }
+
+      uiPanel.appendChild(section);
+    }
+
+    // ASCII section (if any pack has ascii animations)
+    const allAscii = getAllAsciiAnims();
+    if (Object.keys(allAscii).length > 0) {
+      buildAsciiUI(allAscii);
+    }
+  }
+
+  function buildAsciiUI(allAscii) {
+    const section = document.createElement('div');
+    section.className = 'control-section bf-pack-section';
+    section.innerHTML = '<h3>🎮 ASCII Animations</h3>';
+
+    // Select
+    const row1 = document.createElement('div');
+    row1.className = 'toggle-row';
+    row1.style.flexWrap = 'wrap';
+    const sel = document.createElement('select');
+    sel.id = 'asciiSelect';
+    sel.style.cssText = "flex:1;background:#0d0d1a;color:#00ff88;border:1px solid #333;border-radius:6px;padding:0.4rem;font-family:'JetBrains Mono',monospace;font-size:0.75rem;";
+    sel.innerHTML = '<option value="">— select animation —</option>';
+    // Group by pack
+    const byPack = {};
+    for (const [name, anim] of Object.entries(allAscii)) {
+      const p = anim.packName || 'Unknown';
+      if (!byPack[p]) byPack[p] = [];
+      byPack[p].push({ name, ...anim });
+    }
+    for (const [packName, anims] of Object.entries(byPack)) {
+      const group = document.createElement('optgroup');
+      group.label = packName;
+      for (const a of anims) {
+        const opt = document.createElement('option');
+        opt.value = a.name;
+        opt.textContent = `${a.icon || '▸'} ${a.label || a.name}`;
+        group.appendChild(opt);
+      }
+      sel.appendChild(group);
+    }
+    row1.appendChild(sel);
+
+    const playBtn = document.createElement('button');
+    playBtn.className = 'toggle-btn';
+    playBtn.style.marginLeft = '0.5rem';
+    playBtn.textContent = '▶ Play';
+    playBtn.onclick = () => {
+      if (asciiState) {
+        stopAscii();
+        playBtn.textContent = '▶ Play';
+        playBtn.classList.remove('active');
+      } else {
+        const name = sel.value;
+        if (!name) return;
+        const zone = document.getElementById('asciiZone').value;
+        const color = document.getElementById('asciiColor').value;
+        const x = parseInt(document.getElementById('asciiX').value);
+        const y = parseInt(document.getElementById('asciiY').value);
+        playAscii(name, zone, x, y, color);
+        playBtn.textContent = '⏹ Stop';
+        playBtn.classList.add('active');
+      }
+      updateShorthandUI();
+    };
+    row1.appendChild(playBtn);
+    section.appendChild(row1);
+
+    // Zone + color row
+    const row2 = document.createElement('div');
+    row2.className = 'toggle-row';
+    row2.style.cssText = 'flex-wrap:wrap;margin-top:0.4rem;';
+    row2.innerHTML = `
+      <label style="color:#888;font-size:0.7rem;margin-right:0.5rem;">Zone:</label>
+      <select id="asciiZone" style="background:#0d0d1a;color:#aaa;border:1px solid #333;border-radius:4px;padding:0.3rem;font-size:0.7rem;">
+        <option value="mid">Mid</option><option value="top">Top</option><option value="bot">Bottom</option>
+      </select>
+      <label style="color:#888;font-size:0.7rem;margin-left:0.8rem;margin-right:0.5rem;">Color:</label>
+      <select id="asciiColor" style="background:#0d0d1a;color:#aaa;border:1px solid #333;border-radius:4px;padding:0.3rem;font-size:0.7rem;">
+        <option value="#00ff88">Green</option><option value="#00ffff">Cyan</option><option value="#ff00ff">Magenta</option>
+        <option value="#ffaa00">Amber</option><option value="#ff4444">Red</option><option value="#ffffff">White</option>
+      </select>`;
+    section.appendChild(row2);
+
+    // X/Y sliders
+    const makeSlider = (id, label) => {
+      const div = document.createElement('div');
+      div.style.marginTop = '0.3rem';
+      div.innerHTML = `<label style="color:#888;font-size:0.7rem;">${label}: <span id="${id}Val">50</span>%</label>
+        <input type="range" id="${id}" min="0" max="100" value="50" style="width:100%;accent-color:#00ff88;">`;
+      div.querySelector('input').oninput = function () {
+        document.getElementById(`${id}Val`).textContent = this.value;
+        const xv = parseInt(document.getElementById('asciiX').value);
+        const yv = parseInt(document.getElementById('asciiY').value);
+        updateAsciiPos(xv, yv);
+      };
+      return div;
+    };
+    section.appendChild(makeSlider('asciiX', 'X'));
+    section.appendChild(makeSlider('asciiY', 'Y'));
+
+    uiPanel.appendChild(section);
+  }
+
+  function updateShorthandUI() {
+    const el = document.getElementById('liveShorthand');
+    if (el) el.value = buildShorthand();
+  }
+
+  // ============================================================
+  // INITIALIZATION
+  // ============================================================
+  function init(cardEl, layerEls, tilt, panelEl) {
+    card = cardEl;
+    layers = layerEls;
+    tiltState = tilt;
+    uiPanel = panelEl || null;
+    if (uiPanel) rebuildUI();
+    console.log(`[Bifrost] Engine initialized. ${Object.keys(packs).length} packs, ${Object.keys(effects).length} effects.`);
+  }
+
+  // ============================================================
+  // PUBLIC API
+  // ============================================================
+  return {
+    registerPack,
+    init,
+    activate,
+    deactivate,
+    toggle,
+    deactivateAll,
+    toggleText,
+    playAscii,
+    stopAscii,
+    updateAsciiPos,
+    activateBorder,
+    buildShorthand,
+    applyShorthand,
+    rebuildUI,
+    // Expose state for debugging
+    get packs() { return packs; },
+    get effects() { return effects; },
+    get active() { return active; },
+    get activeText() { return activeText; },
+    get asciiState() { return asciiState; },
+    get card() { return card; },
+    getLayer,
+    getAllAsciiAnims,
+    updateShorthandUI
+  };
 })();
