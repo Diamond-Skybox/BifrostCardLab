@@ -24,7 +24,7 @@
   var BLOCKLIST_URL = 'REPLACE_WITH_BLOCKLIST_URL';
   var FRAMES_URL    = 'REPLACE_WITH_FRAMES_URL';
 
-  // GM_xmlhttpRequest wrappers — bypass CORS
+  // GM_xmlhttpRequest wrapper — bypasses CORS
   function gmFetchJSON(url) {
     return new Promise(function(resolve) {
       if (!url) { resolve(null); return; }
@@ -36,18 +36,6 @@
           catch(e) { resolve(null); }
         },
         onerror: function() { resolve(null); }
-      });
-    });
-  }
-
-  function gmFetchText(url) {
-    return new Promise(function(resolve) {
-      if (!url) { resolve(''); return; }
-      GM_xmlhttpRequest({
-        method: 'GET',
-        url: url,
-        onload: function(resp) { resolve(resp.responseText || ''); },
-        onerror: function() { resolve(''); }
       });
     });
   }
@@ -79,42 +67,35 @@
       var packUrls = packs.map(function(p) { return p.url; }).filter(Boolean);
       var engineUrl = ROOT + '/bifrost-engine.js';
 
-      // Also fetch engine + pack source as text for Lab blob inlining
-      var textFetches = [gmFetchText(engineUrl)].concat(
-        packUrls.map(function(url) { return gmFetchText(url); })
-      );
+      // Store on window so bifrostbadge.js can read them
+      window.__bifrostData = {
+        root: ROOT,
+        engineUrl: engineUrl,
+        manifest: manifest,
+        blocklist: results[1],
+        userFrames: results[2]
+      };
 
-      return Promise.all(textFetches).then(function(sources) {
-        // Store on window so bifrostbadge.js can read them
-        window.__bifrostData = {
-          root: ROOT,
-          engineUrl: engineUrl,
-          manifest: manifest,
-          blocklist: results[1],
-          userFrames: results[2],
-          engineSource: sources[0] || '',
-          packSources: sources.slice(1)
-        };
+      console.log('[BifrostBadge] Data loaded, manifest has', packs.length, 'packs');
 
-        // Load engine
-        var engine = document.createElement('script');
-        engine.type = 'text/javascript';
-        engine.src = engineUrl;
-        engine.onload = function() {
-          if (packUrls.length === 0) return loadMain();
+      // Load engine
+      var engine = document.createElement('script');
+      engine.type = 'text/javascript';
+      engine.src = engineUrl;
+      engine.onload = function() {
+        if (packUrls.length === 0) return loadMain();
 
-          var loaded = 0;
-          packUrls.forEach(function(url) {
-            var pack = document.createElement('script');
-            pack.type = 'text/javascript';
-            pack.src = url;
-            pack.onload = function() { if (++loaded >= packUrls.length) loadMain(); };
-            pack.onerror = function() { if (++loaded >= packUrls.length) loadMain(); };
-            head.appendChild(pack);
-          });
-        };
-        head.appendChild(engine);
-      });
+        var loaded = 0;
+        packUrls.forEach(function(url) {
+          var pack = document.createElement('script');
+          pack.type = 'text/javascript';
+          pack.src = url;
+          pack.onload = function() { if (++loaded >= packUrls.length) loadMain(); };
+          pack.onerror = function() { console.warn('[BifrostBadge] Failed to load pack:', url); if (++loaded >= packUrls.length) loadMain(); };
+          head.appendChild(pack);
+        });
+      };
+      head.appendChild(engine);
     });
 
     function loadMain() {
