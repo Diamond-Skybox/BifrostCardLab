@@ -713,12 +713,20 @@ function initLab(alias, initialFx, tiltState) {
   }
 
   function updateShorthand() {
+    // Use engine's buildShorthand if available — it includes ASCII position/color
+    if (Bifrost && Bifrost.buildShorthand) {
+      var engineSh = Bifrost.buildShorthand();
+      // Strip fx: prefix for display
+      currentShorthand = engineSh.startsWith('fx:') ? engineSh.slice(3) : engineSh;
+      document.getElementById('shorthandDisplay').value = currentShorthand || 'No effects selected';
+      return;
+    }
+    // Fallback: build from selections map
     var parts = [];
     selections.forEach(function(zone, key) {
       if (key.startsWith('ascii:')) {
         parts.push(key + '.' + zone);
       } else {
-        // key is fxId-zone, we want fxId.zone
         var dashIdx = key.lastIndexOf('-');
         var fxId = key.slice(0, dashIdx);
         var z = key.slice(dashIdx + 1);
