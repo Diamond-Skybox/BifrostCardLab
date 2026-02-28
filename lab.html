@@ -358,6 +358,98 @@ function initLab(alias, initialFx, tiltState) {
   // ---- Build pack UI ----
   buildPackUI();
 
+  // Sync UI to match already-applied shorthand
+  if (currentShorthand && window.Bifrost) {
+    syncUIFromEngine();
+  }
+
+  function syncUIFromEngine() {
+    if (!Bifrost) return;
+
+    // Sync standard/border effects from engine's active map
+    var activeEntries = Bifrost.active;
+    for (var key in activeEntries) {
+      var info = activeEntries[key];
+      selections.set(key, info.zone);
+      // Find and highlight matching button
+      document.querySelectorAll('.effect-btn[data-fx-id="' + info.effectId + '"][data-zone="' + info.zone + '"]').forEach(function(btn) {
+        btn.classList.add('active');
+      });
+    }
+
+    // Sync text effects
+    if (Bifrost.activeText) {
+      Bifrost.activeText.forEach(function(cls) {
+        var fxId = cls.replace('text-', '');
+        selections.set(fxId + '-text', 'text');
+        document.querySelectorAll('.effect-btn[data-fx-id="' + fxId + '"][data-zone="text"]').forEach(function(btn) {
+          btn.classList.add('active');
+        });
+      });
+    }
+
+    // Sync ASCII — add entries for each active ASCII
+    var asciiEntries = document.getElementById('asciiEntries');
+    var allAscii = Bifrost.getAllAsciiAnims ? Bifrost.getAllAsciiAnims() : {};
+    var byPack = {};
+    for (var name in allAscii) {
+      var a = allAscii[name];
+      var pName = a.packName || 'Unknown';
+      if (!byPack[pName]) byPack[pName] = [];
+      byPack[pName].push({ id: name, label: a.label || name, icon: a.icon || '▸' });
+    }
+
+    if (Bifrost.activeAscii && asciiEntries) {
+      for (var animName in Bifrost.activeAscii) {
+        var state = Bifrost.activeAscii[animName];
+        selections.set('ascii:' + animName, state.zone);
+        addAsciiEntry(asciiEntries, byPack, allAscii);
+        var lastEntry = asciiEntries.lastElementChild;
+        if (lastEntry) {
+          // Find which pack this anim belongs to and set dropdowns
+          var packSel = lastEntry.querySelector('select:first-of-type');
+          for (var pName in byPack) {
+            for (var i = 0; i < byPack[pName].length; i++) {
+              if (byPack[pName][i].id === animName) {
+                packSel.value = pName;
+                packSel.dispatchEvent(new Event('change'));
+                break;
+              }
+            }
+          }
+          var animSel = lastEntry.querySelectorAll('select')[1];
+          if (animSel) animSel.value = animName;
+          var zoneSel = lastEntry.querySelector('.ascii-zone-sel');
+          if (zoneSel) zoneSel.value = state.zone;
+          var colorSel = lastEntry.querySelector('.ascii-color-sel');
+          if (colorSel) colorSel.value = state.color;
+          var xRange = lastEntry.querySelector('.ascii-x-range');
+          var yRange = lastEntry.querySelector('.ascii-y-range');
+          if (xRange) { xRange.value = state.x; lastEntry.querySelector('.ascii-x-val').textContent = state.x; }
+          if (yRange) { yRange.value = state.y; lastEntry.querySelector('.ascii-y-val').textContent = state.y; }
+          lastEntry._playing = true;
+          lastEntry._playingId = animName;
+          var playBtn = lastEntry.querySelector('.effect-btn');
+          if (playBtn) { playBtn.textContent = '⏹ Stop'; playBtn.classList.add('active'); }
+        }
+      }
+    }
+
+    // Expand packs that have active effects
+    for (var key in activeEntries) {
+      var packId = activeEntries[key].packId;
+      var sw = document.getElementById('switch-' + packId);
+      var ef = document.getElementById('effects-' + packId);
+      if (sw && !sw.classList.contains('on')) {
+        sw.classList.add('on');
+        sw.parentElement.classList.add('enabled');
+        if (ef) ef.classList.add('visible');
+      }
+    }
+
+    updateShorthand();
+  }
+
   function buildPackUI() {
     var packList = document.getElementById('packList');
     packList.innerHTML = '';
@@ -380,14 +472,33 @@ function initLab(alias, initialFx, tiltState) {
 
       if (totalCount === 0) continue;
 
+      // Build count label
+      var countParts = [];
+      if (effectIds.length > 0) countParts.push(effectIds.length + ' effects');
+      if (asciiIds.length > 0) countParts.push(asciiIds.length + ' ASCII');
+      var countLabel = countParts.join(' · ');
+
       var wrapper = document.createElement('div');
 
       // Toggle header
       var toggle = document.createElement('div');
       toggle.className = 'pack-toggle';
+
+      if (effectIds.length === 0) {
+        // ASCII-only pack — show info but no toggle switch
+        toggle.innerHTML = '<div class="pack-info"><div class="pack-name">'
+          + (pack.icon||'📦') + ' ' + pack.name
+          + '</div><div class="pack-count">' + countLabel + '</div></div>';
+        toggle.style.cursor = 'default';
+        wrapper.appendChild(toggle);
+        wrapper.appendChild(document.createElement('div')); // empty effects div
+        packList.appendChild(wrapper);
+        continue;
+      }
+
       toggle.innerHTML = '<div class="pack-info"><div class="pack-name">'
         + (pack.icon||'📦') + ' ' + pack.name
-        + '</div><div class="pack-count">' + totalCount + ' effects</div></div>'
+        + '</div><div class="pack-count">' + countLabel + '</div></div>'
         + '<div class="pack-switch" id="switch-'+packId+'"></div>';
 
       // Effects container
@@ -429,6 +540,8 @@ function initLab(alias, initialFx, tiltState) {
             // Text effect — single button
             var btn = document.createElement('div');
             btn.className = 'effect-btn';
+            btn.dataset.fxId = fx.id;
+            btn.dataset.zone = 'text';
             btn.textContent = (fx.def.icon || '✏️') + ' ' + (fx.def.name || fx.id);
             btn.addEventListener('click', function() {
               toggleEffect(fx.id, 'text', btn);
@@ -438,6 +551,8 @@ function initLab(alias, initialFx, tiltState) {
             // Border effect — single button
             var btn = document.createElement('div');
             btn.className = 'effect-btn';
+            btn.dataset.fxId = fx.id;
+            btn.dataset.zone = 'border';
             btn.textContent = (fx.def.icon || '🔲') + ' ' + (fx.def.name || fx.id);
             btn.addEventListener('click', function() {
               toggleEffect(fx.id, 'border', btn);
