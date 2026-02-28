@@ -12,7 +12,7 @@ window.Bifrost = (() => {
   const effects = {};       // flat lookup: { effectId: { pack, def } }
   const active = {};         // { 'effectId-zone': { ctx, packId, effectId, zone } }
   const activeText = new Set();
-  let asciiState = null;
+  const activeAscii = {};    // { animName: { iv, el, pre, name, zone, x, y, color } }
   let card, layers, tiltState, uiPanel;
   let parallaxEnabled = true, parallaxStrength = 8;
 
@@ -185,10 +185,8 @@ window.Bifrost = (() => {
       activeText.clear();
     }
     // Clear ascii
-    if (asciiState) {
-      clearInterval(asciiState.iv);
-      asciiState.el.remove();
-      asciiState = null;
+    for (const name of Object.keys(activeAscii)) {
+      stopAscii(name);
     }
   }
 
@@ -234,7 +232,8 @@ window.Bifrost = (() => {
     }
     if (!anim) { console.warn(`[Bifrost] ASCII animation not found: ${animName}`); return; }
 
-    stopAscii();
+    // Stop this specific animation if already playing
+    if (activeAscii[animName]) stopAscii(animName);
 
     const layer = getLayer(zone);
     const container = document.createElement('div');
@@ -246,8 +245,13 @@ window.Bifrost = (() => {
     pre.style.cssText = `position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-50%);color:${color};font-size:10px;opacity:0.8;text-shadow:0 0 4px ${color};font-family:'JetBrains Mono','Courier New',monospace;white-space:pre;line-height:1.1;pointer-events:none;text-align:center;`;
     container.appendChild(pre);
 
-    const maxW = Math.max(...anim.frames.map(f => f.length));
-    const padded = anim.frames.map(f => f.padEnd(maxW));
+    const maxW = Math.max(...anim.frames.map(f => {
+      var lines = f.split('\n');
+      return Math.max(...lines.map(l => l.length));
+    }));
+    const padded = anim.frames.map(f => {
+      return f.split('\n').map(l => l.padEnd(maxW)).join('\n');
+    });
     let idx = 0;
     pre.textContent = padded[0];
 
@@ -256,23 +260,33 @@ window.Bifrost = (() => {
       pre.textContent = padded[idx];
     }, anim.speed);
 
-    asciiState = { iv, el: container, pre, name: animName, zone, x, y, color };
+    activeAscii[animName] = { iv, el: container, pre, name: animName, zone, x, y, color };
   }
 
-  function stopAscii() {
-    if (asciiState) {
-      clearInterval(asciiState.iv);
-      asciiState.el.remove();
-      asciiState = null;
+  function stopAscii(animName) {
+    if (animName) {
+      // Stop specific animation
+      const state = activeAscii[animName];
+      if (state) {
+        clearInterval(state.iv);
+        state.el.remove();
+        delete activeAscii[animName];
+      }
+    } else {
+      // Stop all (backward compat)
+      for (const name of Object.keys(activeAscii)) {
+        stopAscii(name);
+      }
     }
   }
 
-  function updateAsciiPos(x, y) {
-    if (asciiState && asciiState.pre) {
-      asciiState.pre.style.left = `${x}%`;
-      asciiState.pre.style.top = `${y}%`;
-      asciiState.x = x;
-      asciiState.y = y;
+  function updateAsciiPos(animName, x, y) {
+    const state = activeAscii[animName];
+    if (state && state.pre) {
+      state.pre.style.left = `${x}%`;
+      state.pre.style.top = `${y}%`;
+      state.x = x;
+      state.y = y;
     }
   }
 
@@ -320,9 +334,9 @@ window.Bifrost = (() => {
     for (const cls of activeText) {
       parts.push(`${cls.replace('text-', '')}.text`);
     }
-    if (asciiState) {
-      const ac = asciiState.color.replace('#', '');
-      parts.push(`ascii:${asciiState.name}.${asciiState.zone}@${asciiState.x}/${asciiState.y}/${ac}`);
+    for (const state of Object.values(activeAscii)) {
+      const ac = state.color.replace('#', '');
+      parts.push(`ascii:${state.name}.${state.zone}@${state.x}/${state.y}/${ac}`);
     }
     return `fx:${parts.join(',')}`;
   }
@@ -608,13 +622,13 @@ window.Bifrost = (() => {
     playBtn.style.marginLeft = '0.5rem';
     playBtn.textContent = '▶ Play';
     playBtn.onclick = () => {
-      if (asciiState) {
-        stopAscii();
+      const name = sel.value;
+      if (!name) return;
+      if (activeAscii[name]) {
+        stopAscii(name);
         playBtn.textContent = '▶ Play';
         playBtn.classList.remove('active');
       } else {
-        const name = sel.value;
-        if (!name) return;
         const zone = document.getElementById('asciiZone').value;
         const color = document.getElementById('asciiColor').value;
         const x = parseInt(document.getElementById('asciiX').value);
@@ -654,7 +668,8 @@ window.Bifrost = (() => {
         document.getElementById(`${id}Val`).textContent = this.value;
         const xv = parseInt(document.getElementById('asciiX').value);
         const yv = parseInt(document.getElementById('asciiY').value);
-        updateAsciiPos(xv, yv);
+        const name = sel.value;
+        if (name) updateAsciiPos(name, xv, yv);
       };
       return div;
     };
@@ -704,7 +719,7 @@ window.Bifrost = (() => {
     get effects() { return effects; },
     get active() { return active; },
     get activeText() { return activeText; },
-    get asciiState() { return asciiState; },
+    get activeAscii() { return activeAscii; },
     get card() { return card; },
     getLayer,
     getAllAsciiAnims,
