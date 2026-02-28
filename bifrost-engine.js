@@ -242,7 +242,7 @@ window.Bifrost = (() => {
     layer.appendChild(container);
 
     const pre = document.createElement('pre');
-    pre.style.cssText = `position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-50%);color:${color};font-size:10px;opacity:0.8;text-shadow:0 0 4px ${color};font-family:'JetBrains Mono','Courier New',monospace;white-space:pre;line-height:1.1;pointer-events:none;text-align:center;`;
+    pre.style.cssText = `position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-50%);color:${color};font-size:10px;opacity:0.8;text-shadow:0 0 4px ${color};font-family:'JetBrains Mono','Courier New',monospace;white-space:pre;line-height:1.1;pointer-events:none;text-align:center;background:transparent;margin:0;padding:0;border:none;`;
     container.appendChild(pre);
 
     const maxW = Math.max(...anim.frames.map(f => {
