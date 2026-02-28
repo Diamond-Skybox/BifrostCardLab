@@ -87,6 +87,7 @@ body{background:#0a0a12;color:#eee;font-family:'Space Grotesk',sans-serif;min-he
 .toast.show{transform:translateX(-50%) translateY(0)}
 .loading-msg{color:#666;font-size:0.85rem;text-align:center;padding:1rem}
 .cat-label{color:#666;font-size:0.65rem;text-transform:uppercase;letter-spacing:1px;margin:0.75rem 0 0.3rem;padding-bottom:0.2rem;border-bottom:1px solid #1a1a2e}
+.ascii-section{background:#111;border:1px solid #333;border-radius:10px;padding:1rem;margin-top:1rem}
 .ascii-controls{background:#0d0d1a;border:1px solid #333;border-radius:8px;padding:0.75rem;margin-top:0.4rem}
 .ascii-select{width:100%;background:#16213e;color:#00ff88;border:1px solid #333;border-radius:6px;padding:0.4rem;font-family:monospace;font-size:0.8rem;margin-bottom:0.5rem}
 .ascii-options{display:flex;gap:1rem;margin-bottom:0.5rem;flex-wrap:wrap}
@@ -462,65 +463,6 @@ function initLab(alias, initialFx, tiltState) {
         effectsDiv.appendChild(grid);
       });
 
-      // ---- ASCII section for this pack ----
-      if (asciiIds.length > 0) {
-        var asciiLabel = document.createElement('div');
-        asciiLabel.className = 'cat-label';
-        asciiLabel.textContent = '🎮 ASCII Animations';
-        effectsDiv.appendChild(asciiLabel);
-
-        var asciiControls = document.createElement('div');
-        asciiControls.className = 'ascii-controls';
-
-        // Dropdown
-        var sel = document.createElement('select');
-        sel.className = 'ascii-select';
-        sel.innerHTML = '<option value="">— select animation —</option>';
-        asciiIds.forEach(function(animId) {
-          var anim = pack.ascii[animId];
-          var opt = document.createElement('option');
-          opt.value = animId;
-          opt.textContent = (anim.icon || '▸') + ' ' + (anim.label || animId);
-          sel.appendChild(opt);
-        });
-        asciiControls.appendChild(sel);
-
-        // Zone selector
-        var zoneRow = document.createElement('div');
-        zoneRow.className = 'ascii-options';
-        zoneRow.innerHTML =
-          '<label>Zone: <select class="ascii-zone-sel"><option value="mid">Mid</option><option value="top">Top</option><option value="bot">Bot</option></select></label>' +
-          '<label>Color: <select class="ascii-color-sel"><option value="#00ff88">Green</option><option value="#00ffff">Cyan</option><option value="#ff00ff">Magenta</option><option value="#ffaa00">Amber</option><option value="#ff4444">Red</option><option value="#ffffff">White</option></select></label>';
-        asciiControls.appendChild(zoneRow);
-
-        // Play/Stop button
-        var playBtn = document.createElement('div');
-        playBtn.className = 'effect-btn ascii-play-btn';
-        playBtn.textContent = '▶ Play';
-        playBtn.addEventListener('click', function() {
-          var animId = sel.value;
-          if (!animId) return;
-          var key = 'ascii:' + animId;
-          var zone = asciiControls.querySelector('.ascii-zone-sel').value;
-          var color = asciiControls.querySelector('.ascii-color-sel').value;
-          if (selections.has(key)) {
-            if (Bifrost && Bifrost.stopAscii) Bifrost.stopAscii();
-            selections.delete(key);
-            playBtn.textContent = '▶ Play';
-            playBtn.classList.remove('active');
-          } else {
-            if (Bifrost && Bifrost.playAscii) Bifrost.playAscii(animId, zone, 50, 50, color);
-            selections.set(key, zone);
-            playBtn.textContent = '⏹ Stop';
-            playBtn.classList.add('active');
-          }
-          updateShorthand();
-        });
-        asciiControls.appendChild(playBtn);
-
-        effectsDiv.appendChild(asciiControls);
-      }
-
       // ---- PRESETS ----
       if (pack.presets && Object.keys(pack.presets).length > 0) {
         var presetLabel = document.createElement('div');
@@ -591,6 +533,168 @@ function initLab(alias, initialFx, tiltState) {
       wrapper.appendChild(effectsDiv);
       packList.appendChild(wrapper);
     }
+
+    // ---- Global ASCII Art Section ----
+    buildAsciiSection(packList);
+  }
+
+  function buildAsciiSection(packList) {
+    if (!Bifrost || !Bifrost.getAllAsciiAnims) return;
+    var allAscii = Bifrost.getAllAsciiAnims();
+    if (Object.keys(allAscii).length === 0) return;
+
+    // Group by pack
+    var byPack = {};
+    for (var name in allAscii) {
+      var a = allAscii[name];
+      var pName = a.packName || 'Unknown';
+      if (!byPack[pName]) byPack[pName] = [];
+      byPack[pName].push({ id: name, label: a.label || name, icon: a.icon || '▸' });
+    }
+
+    var section = document.createElement('div');
+    section.className = 'ascii-section';
+    section.innerHTML = '<h3 style="color:#00ff88;margin-bottom:0.75rem;">🎮 ASCII Art</h3>';
+
+    var asciiList = document.createElement('div');
+    asciiList.id = 'asciiEntries';
+    section.appendChild(asciiList);
+
+    // Add button
+    var addBtn = document.createElement('div');
+    addBtn.className = 'effect-btn';
+    addBtn.style.cssText = 'display:inline-block;margin-top:0.5rem;border-color:#00ff88;color:#00ff88;';
+    addBtn.textContent = '+ Add ASCII Art';
+    addBtn.addEventListener('click', function() {
+      addAsciiEntry(asciiList, byPack, allAscii);
+    });
+    section.appendChild(addBtn);
+
+    packList.appendChild(section);
+  }
+
+  function addAsciiEntry(container, byPack, allAscii) {
+    var entry = document.createElement('div');
+    entry.className = 'ascii-controls';
+    entry.style.marginBottom = '0.5rem';
+
+    // Pack dropdown
+    var packSel = document.createElement('select');
+    packSel.className = 'ascii-select';
+    packSel.innerHTML = '<option value="">— select pack —</option>';
+    for (var pName in byPack) {
+      var opt = document.createElement('option');
+      opt.value = pName;
+      opt.textContent = pName;
+      packSel.appendChild(opt);
+    }
+    entry.appendChild(packSel);
+
+    // Animation dropdown (populated on pack select)
+    var animSel = document.createElement('select');
+    animSel.className = 'ascii-select';
+    animSel.style.marginTop = '0.3rem';
+    animSel.innerHTML = '<option value="">— select animation —</option>';
+    animSel.disabled = true;
+    entry.appendChild(animSel);
+
+    packSel.addEventListener('change', function() {
+      animSel.innerHTML = '<option value="">— select animation —</option>';
+      var anims = byPack[packSel.value] || [];
+      anims.forEach(function(a) {
+        var opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = a.icon + ' ' + a.label;
+        animSel.appendChild(opt);
+      });
+      animSel.disabled = anims.length === 0;
+    });
+
+    // Controls row: zone, color
+    var ctrlRow = document.createElement('div');
+    ctrlRow.className = 'ascii-options';
+    ctrlRow.style.marginTop = '0.4rem';
+    ctrlRow.innerHTML =
+      '<label>Zone: <select class="ascii-zone-sel">' +
+        '<option value="mid">Mid</option><option value="top">Top</option><option value="bot">Bot</option>' +
+      '</select></label>' +
+      '<label>Color: <select class="ascii-color-sel">' +
+        '<option value="#00ff88">Green</option><option value="#00ffff">Cyan</option>' +
+        '<option value="#ff00ff">Magenta</option><option value="#ffaa00">Amber</option>' +
+        '<option value="#ff4444">Red</option><option value="#ffffff">White</option>' +
+      '</select></label>';
+    entry.appendChild(ctrlRow);
+
+    // X/Y sliders
+    function makeSlider(label, id, defaultVal) {
+      var div = document.createElement('div');
+      div.style.marginTop = '0.3rem';
+      div.innerHTML = '<label style="color:#888;font-size:0.7rem;">' + label + ': <span class="' + id + '-val">'+defaultVal+'</span>%</label>' +
+        '<input type="range" class="' + id + '-range" min="0" max="100" value="'+defaultVal+'" style="width:100%;accent-color:#00ff88;">';
+      div.querySelector('input').addEventListener('input', function() {
+        div.querySelector('.' + id + '-val').textContent = this.value;
+        // Update position live if playing
+        if (entry._playing && entry._playingId && Bifrost && Bifrost.updateAsciiPos) {
+          var xv = parseInt(entry.querySelector('.ascii-x-range').value);
+          var yv = parseInt(entry.querySelector('.ascii-y-range').value);
+          Bifrost.updateAsciiPos(entry._playingId, xv, yv);
+        }
+      });
+      return div;
+    }
+    entry.appendChild(makeSlider('X', 'ascii-x', 50));
+    entry.appendChild(makeSlider('Y', 'ascii-y', 50));
+
+    // Button row: Play/Stop + Remove
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:0.5rem;margin-top:0.4rem;';
+
+    var playBtn = document.createElement('div');
+    playBtn.className = 'effect-btn';
+    playBtn.textContent = '▶ Play';
+    playBtn.addEventListener('click', function() {
+      var animId = animSel.value;
+      if (!animId) return;
+      var zone = entry.querySelector('.ascii-zone-sel').value;
+      var color = entry.querySelector('.ascii-color-sel').value;
+      var x = parseInt(entry.querySelector('.ascii-x-range').value);
+      var y = parseInt(entry.querySelector('.ascii-y-range').value);
+
+      if (entry._playing) {
+        if (Bifrost && Bifrost.stopAscii) Bifrost.stopAscii(entry._playingId);
+        selections.delete('ascii:' + entry._playingId);
+        playBtn.textContent = '▶ Play';
+        playBtn.classList.remove('active');
+        entry._playing = false;
+        entry._playingId = null;
+      } else {
+        if (Bifrost && Bifrost.playAscii) Bifrost.playAscii(animId, zone, x, y, color);
+        selections.set('ascii:' + animId, zone);
+        playBtn.textContent = '⏹ Stop';
+        playBtn.classList.add('active');
+        entry._playing = true;
+        entry._playingId = animId;
+      }
+      updateShorthand();
+    });
+    btnRow.appendChild(playBtn);
+
+    var removeBtn = document.createElement('div');
+    removeBtn.className = 'effect-btn';
+    removeBtn.style.cssText = 'border-color:#ff4444;color:#ff4444;';
+    removeBtn.textContent = '✕';
+    removeBtn.addEventListener('click', function() {
+      if (entry._playing) {
+        if (Bifrost && Bifrost.stopAscii) Bifrost.stopAscii(entry._playingId);
+        selections.delete('ascii:' + entry._playingId);
+        updateShorthand();
+      }
+      entry.remove();
+    });
+    btnRow.appendChild(removeBtn);
+
+    entry.appendChild(btnRow);
+    container.appendChild(entry);
   }
 
   // ---- Effect toggling ----
