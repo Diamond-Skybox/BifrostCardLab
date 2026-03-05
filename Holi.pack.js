@@ -258,9 +258,9 @@ Bifrost.registerPack({
           do {
             x = 3 + Math.random() * 75; // keep away from right edge
             if (ctx.zone === 'top') {
-              y = 2 + Math.random() * 45;
+              y = 2 + Math.random() * 60;
             } else {
-              y = 50 + Math.random() * 45;
+              y = 30 + Math.random() * 62;
             }
             attempts++;
           } while (attempts < 10 && placed.some(p => Math.abs(p.x - x) < 18 && Math.abs(p.y - y) < 18));
